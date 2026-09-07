@@ -1,14 +1,6 @@
-# Lecoinmalin34 Photos Bot
+# Le Coin Malin 34 — Premium V2
 
-Bot Telegram catalogue prêt pour Railway.
+Cette version inclut **photos + vidéos** depuis l'export Telegram et utilise le logo fourni.
 
-- Source: `@Lecoinmalin34`
-- 37 catégories contenant des photos
-- 3399 photos indexées depuis l'export Telegram
-- 100 photos maximum par page pour respecter `copyMessages`
-
-## Variables Railway
-- `BOT_TOKEN` = token du nouveau bot (à saisir uniquement dans Railway)
-- `SOURCE_CHAT` = `@Lecoinmalin34`
-
-Ne mettez jamais le token dans les fichiers GitHub.
+Variables Railway : `BOT_TOKEN` et `SOURCE_CHAT=@Lecoinmalin34`.
+Pour la Mini App : Railway → Settings → Networking → Generate Domain.

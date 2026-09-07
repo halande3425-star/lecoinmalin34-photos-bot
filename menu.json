@@ -1,0 +1,102 @@
+{
+  "groups": [
+    {
+      "id": "shoes",
+      "emoji": "👟",
+      "title": "Chaussures",
+      "subtitle": "Homme, femme, luxe, football, UGG, Crocs, enfant",
+      "topics": [
+        "64",
+        "3616",
+        "402",
+        "663",
+        "767",
+        "4147"
+      ]
+    },
+    {
+      "id": "clothes",
+      "emoji": "👕",
+      "title": "Vêtements",
+      "subtitle": "Sport, luxe, Essentials, Alo, ensembles, doudounes",
+      "topics": [
+        "1219",
+        "1525",
+        "934",
+        "1056",
+        "1066",
+        "5977",
+        "5942",
+        "122",
+        "527"
+      ]
+    },
+    {
+      "id": "tech",
+      "emoji": "📱",
+      "title": "High-Tech",
+      "subtitle": "Électronique, Dyson, coques, lunettes Meta, PC gamer",
+      "topics": [
+        "223",
+        "168",
+        "1041",
+        "2753",
+        "5519"
+      ]
+    },
+    {
+      "id": "watches",
+      "emoji": "⌚",
+      "title": "Montres & Bijoux",
+      "subtitle": "Montres, G‑Shock, bracelets & joncs",
+      "topics": [
+        "476",
+        "215",
+        "190"
+      ]
+    },
+    {
+      "id": "accessories",
+      "emoji": "👜",
+      "title": "Accessoires",
+      "subtitle": "Sacs, casquettes, lunettes, parfums, valises",
+      "topics": [
+        "56",
+        "144",
+        "314",
+        "444",
+        "1086",
+        "805",
+        "5993"
+      ]
+    },
+    {
+      "id": "home",
+      "emoji": "🏠",
+      "title": "Maison",
+      "subtitle": "Canapé & produits maison",
+      "topics": [
+        "5502"
+      ]
+    },
+    {
+      "id": "more",
+      "emoji": "✨",
+      "title": "Services & Plus",
+      "subtitle": "Moto, vente en gros, commandes, offres & avis",
+      "topics": [
+        "2522",
+        "3327",
+        "294",
+        "76",
+        "2854",
+        "5793",
+        "5795",
+        "5799",
+        "5",
+        "2",
+        "3476"
+      ]
+    }
+  ]
+}
