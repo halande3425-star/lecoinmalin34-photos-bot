@@ -1,6 +1,15 @@
-# Le Coin Malin 34 — Premium V2
+# LE COIN MALIN 34 — Menu PRO
 
-Cette version inclut **photos + vidéos** depuis l'export Telegram et utilise le logo fourni.
+Menu principal volontairement court :
+- Chaussures
+- Vêtements
+- High-Tech
+- Montres & Bijoux
+- Accessoires
+- Produits prêts à être expédiés
+- Comment passer commande
+- Avis clients
+- Voir plus
 
-Variables Railway : `BOT_TOKEN` et `SOURCE_CHAT=@Lecoinmalin34`.
-Pour la Mini App : Railway → Settings → Networking → Generate Domain.
+Le bouton **Voir plus** conserve les autres catalogues/services.
+Photos et vidéos restent prises depuis `catalog.json`.

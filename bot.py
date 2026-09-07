@@ -31,28 +31,27 @@ def api(method, **data):
 
 def send_start(chat_id):
     caption = (
-        "🛍️ <b>LE COIN MALIN 34</b>\n"
-        "<i>Catalogue Premium</i>\n\n"
-        "Toutes nos catégories, photos et vidéos réunies au même endroit.\n"
-        "Choisis une catégorie pour consulter le catalogue 👇"
+        "✨ <b>LE COIN MALIN 34</b>\n"
+        "<i>Catalogue officiel</i>\n\n"
+        "Bienvenue dans notre catalogue.\n"
+        "Choisissez une catégorie pour découvrir nos produits, photos et vidéos. 👇"
     )
-    kb = {"inline_keyboard": []}
-    if WEBAPP_URL:
-        kb["inline_keyboard"].append([{"text":"✨ Ouvrir le catalogue","web_app":{"url":WEBAPP_URL}}])
-    kb["inline_keyboard"].append([
-        {"text":"👟 Chaussures","callback_data":"group:shoes"},
-        {"text":"👕 Vêtements","callback_data":"group:clothes"}
-    ])
-    kb["inline_keyboard"].append([
-        {"text":"📱 High-Tech","callback_data":"group:tech"},
-        {"text":"⌚ Montres & Bijoux","callback_data":"group:watches"}
-    ])
-    kb["inline_keyboard"].append([
-        {"text":"👜 Accessoires","callback_data":"group:accessories"},
-        {"text":"✨ Voir plus","callback_data":"group:more"}
-    ])
 
-    # Professional welcome card with the supplied logo.
+    rows = [
+        [{"text":"👟  Chaussures","callback_data":"group:shoes"}],
+        [{"text":"👕  Vêtements","callback_data":"group:clothes"}],
+        [{"text":"📱  High-Tech","callback_data":"group:tech"}],
+        [{"text":"⌚  Montres & Bijoux","callback_data":"group:watches"}],
+        [{"text":"👜  Accessoires","callback_data":"group:accessories"}],
+        [{"text":"🚚  Produits prêts à être expédiés","callback_data":"group:ready"}],
+        [{"text":"🛒  Comment passer commande","callback_data":"group:order"}],
+        [{"text":"💬  Avis clients","callback_data":"group:reviews"}],
+        [{"text":"✨  Voir plus","callback_data":"group:more"}],
+    ]
+    if WEBAPP_URL:
+        rows.insert(0, [{"text":"🛍️  Ouvrir le catalogue Premium","web_app":{"url":WEBAPP_URL}}])
+    kb = {"inline_keyboard": rows}
+
     try:
         with open("web/logo.png", "rb") as f:
             files = {"photo": ("logo.png", f, "image/png")}
