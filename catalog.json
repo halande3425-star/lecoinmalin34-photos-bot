@@ -5,7 +5,9 @@
       497,
       3405,
       3427,
+      3457,
       3523,
+      5178,
       5448,
       5452,
       5453,
@@ -18,11 +20,17 @@
       5460,
       5527,
       5528,
+      5801,
       5814,
-      5861
+      5845,
+      5850,
+      5861,
+      5989,
+      6061
     ],
     "photos": 2,
-    "videos": 16
+    "videos": 16,
+    "texts": 7
   },
   "5": {
     "title": "💬 Avis clients",
@@ -79,6 +87,7 @@
       391,
       392,
       393,
+      394,
       397,
       399,
       400,
@@ -382,7 +391,8 @@
       5935
     ],
     "photos": 223,
-    "videos": 130
+    "videos": 130,
+    "texts": 1
   },
   "56": {
     "title": "Sacoche 👜 et sac",
@@ -678,6 +688,8 @@
       5593,
       5594,
       5595,
+      5596,
+      5704,
       5705,
       5706,
       5707,
@@ -741,11 +753,13 @@
       5765
     ],
     "photos": 185,
-    "videos": 167
+    "videos": 167,
+    "texts": 2
   },
   "64": {
     "title": "Chaussures homme femme",
     "message_ids": [
+      142,
       3599,
       3882,
       3883,
@@ -976,19 +990,24 @@
       4108,
       4109,
       5924,
-      5925
+      5925,
+      6065
     ],
     "photos": 220,
-    "videos": 11
+    "videos": 11,
+    "texts": 2
   },
   "76": {
     "title": "comment passer commande",
     "message_ids": [
       5856,
+      5857,
+      5996,
       6063
     ],
     "photos": 2,
-    "videos": 0
+    "videos": 0,
+    "texts": 2
   },
   "122": {
     "title": "stone et cp",
@@ -1000,6 +1019,7 @@
       127,
       128,
       129,
+      130,
       131,
       867,
       868,
@@ -1045,7 +1065,8 @@
       5915
     ],
     "photos": 48,
-    "videos": 2
+    "videos": 2,
+    "texts": 1
   },
   "144": {
     "title": "casquette de marque",
@@ -1164,10 +1185,12 @@
       3172,
       3207,
       5990,
+      5991,
       5999
     ],
     "photos": 111,
-    "videos": 4
+    "videos": 4,
+    "texts": 1
   },
   "168": {
     "title": "dyson sur commande",
@@ -1180,6 +1203,7 @@
       174,
       175,
       176,
+      177,
       179,
       180,
       181,
@@ -1211,11 +1235,13 @@
       2757
     ],
     "photos": 34,
-    "videos": 3
+    "videos": 3,
+    "texts": 1
   },
   "190": {
     "title": "Bracelets, bracelets et joncs Cartier",
     "message_ids": [
+      191,
       193,
       194,
       195,
@@ -1231,12 +1257,14 @@
       205
     ],
     "photos": 13,
-    "videos": 0
+    "videos": 0,
+    "texts": 1
   },
   "215": {
     "title": "Gshock⌚️",
     "message_ids": [
       216,
+      217,
       219,
       220,
       244,
@@ -1264,7 +1292,8 @@
       3130
     ],
     "photos": 23,
-    "videos": 3
+    "videos": 3,
+    "texts": 1
   },
   "223": {
     "title": "Électronique🎧",
@@ -1350,15 +1379,18 @@
       5640
     ],
     "photos": 65,
-    "videos": 14
+    "videos": 14,
+    "texts": 0
   },
   "294": {
     "title": "Pack fournisseur exploitation",
     "message_ids": [
+      296,
       297
     ],
     "photos": 1,
-    "videos": 0
+    "videos": 0,
+    "texts": 1
   },
   "314": {
     "title": "paire de lunette tout marque",
@@ -1394,7 +1426,8 @@
       1082
     ],
     "photos": 25,
-    "videos": 4
+    "videos": 4,
+    "texts": 0
   },
   "402": {
     "title": "chaussure de football",
@@ -1412,15 +1445,18 @@
       413,
       414,
       415,
-      3222
+      3222,
+      5929
     ],
     "photos": 13,
-    "videos": 1
+    "videos": 1,
+    "texts": 1
   },
   "444": {
     "title": "Parfum homme femme",
     "message_ids": [
       445,
+      446,
       5280,
       5281,
       5282,
@@ -1590,7 +1626,8 @@
       5446
     ],
     "photos": 166,
-    "videos": 2
+    "videos": 2,
+    "texts": 1
   },
   "476": {
     "title": "montre de marque",
@@ -1610,6 +1647,7 @@
       490,
       491,
       492,
+      493,
       757,
       758,
       759,
@@ -1628,7 +1666,8 @@
       5914
     ],
     "photos": 24,
-    "videos": 7
+    "videos": 7,
+    "texts": 1
   },
   "527": {
     "title": "maillot de foot",
@@ -1643,6 +1682,7 @@
       535,
       536,
       537,
+      538,
       540,
       541,
       542,
@@ -1762,11 +1802,13 @@
       3083
     ],
     "photos": 126,
-    "videos": 1
+    "videos": 1,
+    "texts": 1
   },
   "663": {
     "title": "UG",
     "message_ids": [
+      664,
       665,
       666,
       667,
@@ -1774,12 +1816,14 @@
       3203
     ],
     "photos": 5,
-    "videos": 0
+    "videos": 0,
+    "texts": 1
   },
   "767": {
     "title": "crocs",
     "message_ids": [
       768,
+      769,
       771,
       3259,
       3260,
@@ -1793,7 +1837,8 @@
       3268
     ],
     "photos": 12,
-    "videos": 0
+    "videos": 0,
+    "texts": 1
   },
   "805": {
     "title": "Casque arai sur commande 🚀",
@@ -1810,7 +1855,8 @@
       5179
     ],
     "photos": 9,
-    "videos": 1
+    "videos": 1,
+    "texts": 0
   },
   "934": {
     "title": "Ensemble essentials",
@@ -1822,7 +1868,8 @@
       939
     ],
     "photos": 5,
-    "videos": 0
+    "videos": 0,
+    "texts": 0
   },
   "1041": {
     "title": "Coque de téléphone 📱",
@@ -1836,7 +1883,8 @@
       1048
     ],
     "photos": 7,
-    "videos": 0
+    "videos": 0,
+    "texts": 0
   },
   "1056": {
     "title": "Alo femme 👩",
@@ -1848,6 +1896,7 @@
       1061,
       1062,
       1063,
+      1064,
       1084,
       2914,
       2915,
@@ -2019,7 +2068,8 @@
       3088
     ],
     "photos": 174,
-    "videos": 2
+    "videos": 2,
+    "texts": 1
   },
   "1066": {
     "title": "Alo homme 👨",
@@ -2032,7 +2082,8 @@
       5941
     ],
     "photos": 4,
-    "videos": 2
+    "videos": 2,
+    "texts": 0
   },
   "1086": {
     "title": "Valise 🧳",
@@ -2054,7 +2105,8 @@
       2482
     ],
     "photos": 0,
-    "videos": 15
+    "videos": 15,
+    "texts": 0
   },
   "1219": {
     "title": "vêtements all",
@@ -2175,6 +2227,7 @@
       2448,
       2450,
       2451,
+      2457,
       2520,
       2536,
       2537,
@@ -2207,6 +2260,7 @@
       3119,
       3120,
       3121,
+      3139,
       3211,
       3212,
       3213,
@@ -2227,6 +2281,7 @@
       3437,
       3438,
       3553,
+      3574,
       3575,
       3576,
       3577,
@@ -2305,11 +2360,13 @@
       5500
     ],
     "photos": 233,
-    "videos": 11
+    "videos": 11,
+    "texts": 3
   },
   "1525": {
     "title": "vêtements luxe",
     "message_ids": [
+      1526,
       1527,
       1528,
       1529,
@@ -3098,14 +3155,18 @@
       5120
     ],
     "photos": 785,
-    "videos": 1
+    "videos": 1,
+    "texts": 1
   },
   "2522": {
     "title": "⚡️moto électrique",
     "message_ids": [
+      5619,
+      5802,
       5897,
       5899,
       5900,
+      5901,
       5902,
       5903,
       5904,
@@ -3121,21 +3182,25 @@
       5975
     ],
     "photos": 7,
-    "videos": 9
+    "videos": 9,
+    "texts": 3
   },
   "2753": {
     "title": "Lunnete meta qui flime",
     "message_ids": [
       3522,
       5509,
+      5510,
       5658
     ],
     "photos": 1,
-    "videos": 2
+    "videos": 2,
+    "texts": 1
   },
   "2854": {
     "title": "commande client",
     "message_ids": [
+      2855,
       2856,
       2857,
       2858,
@@ -3211,11 +3276,14 @@
       5937
     ],
     "photos": 30,
-    "videos": 43
+    "videos": 43,
+    "texts": 1
   },
   "3327": {
     "title": "📦 VENTE EN GROS SUR COMMANDE 📦",
     "message_ids": [
+      3328,
+      5606,
       5607,
       5608,
       5609,
@@ -3228,11 +3296,23 @@
       5643
     ],
     "photos": 8,
-    "videos": 2
+    "videos": 2,
+    "texts": 2
+  },
+  "3476": {
+    "title": "Produit Prêts à être expédiés",
+    "message_ids": [
+      3477,
+      6062
+    ],
+    "photos": 0,
+    "videos": 0,
+    "texts": 2
   },
   "3616": {
     "title": "Chaussures de luxe 🤩",
     "message_ids": [
+      3861,
       4344,
       4345,
       4346,
@@ -4020,7 +4100,8 @@
       6048
     ],
     "photos": 759,
-    "videos": 26
+    "videos": 26,
+    "texts": 1
   },
   "4147": {
     "title": "Chaussures pour enfants 👶",
@@ -4076,19 +4157,23 @@
       4196,
       4197,
       4203,
+      4258,
       5860
     ],
     "photos": 50,
-    "videos": 2
+    "videos": 2,
+    "texts": 1
   },
   "5502": {
     "title": "Canapé 🛋️ bubble sur commande",
     "message_ids": [
       5504,
-      5505
+      5505,
+      5506
     ],
     "photos": 0,
-    "videos": 2
+    "videos": 2,
+    "texts": 1
   },
   "5519": {
     "title": "Pc gamer 💻",
@@ -4096,7 +4181,8 @@
       5521
     ],
     "photos": 0,
-    "videos": 1
+    "videos": 1,
+    "texts": 0
   },
   "5793": {
     "title": "Basic fit offre",
@@ -4104,7 +4190,8 @@
       5798
     ],
     "photos": 1,
-    "videos": 0
+    "videos": 0,
+    "texts": 0
   },
   "5795": {
     "title": "Location de voiture -40%",
@@ -4112,11 +4199,13 @@
       5797
     ],
     "photos": 1,
-    "videos": 0
+    "videos": 0,
+    "texts": 0
   },
   "5799": {
     "title": "Déblocage snap",
     "message_ids": [
+      5800,
       5804,
       5805,
       5806,
@@ -4128,7 +4217,8 @@
       5812
     ],
     "photos": 9,
-    "videos": 0
+    "videos": 0,
+    "texts": 1
   },
   "5942": {
     "title": "Doudoune hiver ❄️",
@@ -4147,14 +4237,18 @@
       5962,
       5963,
       5965,
-      5966
+      5966,
+      5967
     ],
     "photos": 14,
-    "videos": 1
+    "videos": 1,
+    "texts": 1
   },
   "5977": {
     "title": "Ensemble haut et bas",
     "message_ids": [
+      5978,
+      5979,
       5980,
       5981,
       5982,
@@ -4166,6 +4260,16 @@
       5988
     ],
     "photos": 4,
-    "videos": 5
+    "videos": 5,
+    "texts": 2
+  },
+  "5993": {
+    "title": "Bonnet d’hiver homme femme ☃️",
+    "message_ids": [
+      5994
+    ],
+    "photos": 0,
+    "videos": 0,
+    "texts": 1
   }
 }
