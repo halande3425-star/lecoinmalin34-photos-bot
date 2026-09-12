@@ -1,27 +1,47 @@
-# LE COIN MALIN 34 — AUTO V3
+# LE COIN MALIN 34 — V5.1
 
-Corrections :
-- détecte automatiquement les nouveaux messages texte
-- détecte automatiquement les nouvelles photos
-- détecte automatiquement les nouvelles vidéos
-- accepte aussi edited_message / channel_post
-- identifie le groupe source avec son ID Telegram
-- ajoute `Bonnet d’hiver homme femme ☃️` dans Vêtements
-- inclut les anciens textes présents dans l’export `result(2).json`
+# LE COIN MALIN 34 — V5 MARQUES + RECHERCHE
 
-## IMPORTANT pour la détection automatique
-Le bot doit rester administrateur dans `Lecoinmalin34`.
+# LE COIN MALIN 34 — AUTO V4 MARQUES
 
-Si Telegram ne transmet toujours pas les messages du groupe :
-BotFather → `/setprivacy` → choisir le bot → **Disable**.
+Nouveautés :
+- Chaussures Homme/Femme : sous-menu par marque
+- Chaussures de luxe : sous-menu par marque
+- reconnaissance automatique sur les nouvelles PHOTOS
+- reconnaissance automatique sur la miniature des nouvelles VIDÉOS
+- texte/caption utilisé en priorité quand la marque est déjà écrite
+- catégorie `Autres / À vérifier` si la marque n'est pas assez sûre
+- le catalogue texte/photos/vidéos V3 reste actif
 
-## Railway
-Variables :
-- BOT_TOKEN
-- SOURCE_CHAT=@Lecoinmalin34
+## Variables Railway
+- `BOT_TOKEN`
+- `SOURCE_CHAT=@Lecoinmalin34`
+- `OPENAI_API_KEY` : clé API OpenAI pour la reconnaissance visuelle
+- optionnel `VISION_MODEL=gpt-5.6-luna`
+- optionnel `DATA_DIR=/data`
 
-Pour garder les nouveaux ajouts après un redéploiement Railway :
-ajouter un Volume monté sur `/data`.
+## Volume Railway
+Monter un Volume sur `/data` pour conserver :
+- `catalog_runtime.json`
+- `brand_catalog_runtime.json`
 
-Commande de test dans le bot privé :
-`/status`
+## Important
+Telegram Bot API ne permet pas au bot de relire visuellement toutes les anciennes photos du groupe.
+Les anciennes chaussures restent disponibles via `Tous les modèles`.
+Les NOUVELLES photos/vidéos reçues après V4 sont automatiquement classées par marque.
+
+
+## Nouveautés V5
+- `Chaussures homme/femme` (topic 64) ouvre d'abord un menu de marques.
+- `Chaussures de luxe` (topic 3616) ouvre d'abord un menu de marques luxe.
+- Bouton `🔎 Rechercher une marque / un modèle` dans les deux menus.
+- Recherche par marque ou modèle : `Nike`, `TN`, `New Balance`, `On Running`, `Dior B30`, `LV Runner`, etc.
+- Marques affichées 2 par ligne pour réduire le défilement.
+- `Tous les modèles` reste disponible.
+- Les nouvelles photos/vidéos continuent d'être classées automatiquement comme en V4 si la clé Vision est configurée.
+
+
+## Ajout V5.1
+- Bouton `📦 Articles disponibles sur place` directement sur l’accueil.
+- Ouvre le topic Telegram `https://t.me/Lecoinmalin34/2`.
+- Marques + recherche conservées pour Homme/Femme et Luxe.
