@@ -11,6 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
+BUILD_VERSION = "V5.2-FIX"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -430,7 +431,8 @@ def send_start(chat_id):
     kb = {"inline_keyboard": rows}
 
     try:
-        with open("web/logo.png", "rb") as f:
+        logo_path = "web/logo.png" if os.path.exists("web/logo.png") else "logo.png"
+        with open(logo_path, "rb") as f:
             files = {"photo": ("logo.png", f, "image/png")}
             data = {
                 "chat_id": str(chat_id),
@@ -809,7 +811,8 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print("AUTO V5.1: marques Homme/Femme + Luxe + recherche + Articles sur place = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: marques Homme/Femme + Luxe + recherche + Articles sur place = ACTIVÉ", flush=True)
+    print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print(f"VISION MARQUES: {'ACTIVÉ' if OPENAI_API_KEY else 'OPENAI_API_KEY MANQUANTE'} ({VISION_MODEL})", flush=True)
     threading.Thread(target=poll,daemon=True).start()
     port=int(os.environ.get("PORT","8080"))
