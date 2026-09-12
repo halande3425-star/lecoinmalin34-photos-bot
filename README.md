@@ -1,21 +1,29 @@
-# V5.17 — INDEX EXPORT COMPLET
+# V5.18 — VISION LOCALE GRATUITE POUR LES CHAUSSURES
 
-Cette version exploite directement ton `result(2).json`.
+## Ce que fait cette version
+- Analyse réellement les pixels des photos avec un modèle CLIP local.
+- Aucun appel OpenAI.
+- Analyse les anciens médias des topics :
+  - 64 = Chaussures Homme / Femme
+  - 3616 = Chaussures de luxe
+- Si une paire Dior/LV/Hermès/etc. se trouve dans Homme/Femme, elle est classée dans Luxe.
+- Si une TN/Nike/ASICS/etc. se trouve dans Luxe, elle est classée dans Homme/Femme.
+- Le résultat est sauvegardé dans `/data/brand_catalog_runtime.json`.
+- Après indexation, les recherches `Dior`, `TN`, `ASICS`, etc. sont instantanées.
 
-## Changement interface
-- plus de grosse grille de marques ;
-- Homme/Femme : `🔎 Rechercher dans Homme / Femme` + `👟 Voir tous les modèles`;
-- Luxe : `🔎 Rechercher dans Luxe` + `👟 Voir tous les modèles`.
+## Une seule commande après déploiement
+Dans le chat privé du bot :
+`/indeximages`
 
-## Vitesse
-Aucun scan n'est lancé quand le client tape `TN`, `Dior`, `ASICS`, etc.
-La réponse vient directement du cache `brand_catalog.json`.
+Le premier lancement télécharge le modèle local, puis analyse toutes les images accessibles.
+Les copies temporaires Telegram sont supprimées automatiquement.
 
-## Index trouvé dans l'export
-Homme/Femme : {'TN': 1}
-Luxe : {'Chanel': 1, 'Hermès': 1, 'Prada': 1, 'Dior': 1, 'Louis Vuitton': 1}
+## Railway
+Un volume persistant monté sur `/data` est recommandé.
 
-Limite gratuite : les anciennes photos sans texte/légende/modèle identifiable ne peuvent pas être reconnues uniquement par leurs pixels.
+Log attendu :
+`AUTO V5.18-LOCAL-VISION: vision locale images + reclassement Homme/Femme/Luxe = ACTIVÉ`
 
-Log Railway :
-`AUTO V5.17-EXPORT-INDEX: index export complet + recherche instantanée = ACTIVÉ`
+## Important
+La vision locale est gratuite côté API, mais une reconnaissance d'image n'est jamais garantie à 100 %.
+Le bot analyse réellement toutes les images accessibles et garde son meilleur classement en cache.

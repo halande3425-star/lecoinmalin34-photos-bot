@@ -1,4 +1,4 @@
-import json, os, time, threading, requests
+import json, os, time, threading, requests, io, gc
 from flask import Flask, send_from_directory, jsonify
 
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
@@ -11,11 +11,19 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.17-EXPORT-INDEX"
+BUILD_VERSION = "V5.18-LOCAL-VISION"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 VISION_MODEL = os.environ.get("VISION_MODEL", "gpt-5.6-luna").strip()
+
+# V5.18 : vision locale gratuite (aucune API OpenAI).
+# Le modèle est téléchargé automatiquement au 1er lancement de /indeximages.
+LOCAL_VISION_MODEL = os.environ.get("LOCAL_VISION_MODEL", "openai/clip-vit-base-patch32").strip()
+LOCAL_VISION_MIN_SCORE = float(os.environ.get("LOCAL_VISION_MIN_SCORE", "0.10"))
+LOCAL_VISION = None
+LOCAL_VISION_LOCK = threading.RLock()
+INDEX_OWNER_FILE = None
 
 BRAND_TOPIC_IDS = {"64", "3616"}  # Chaussures Homme/Femme + Chaussures de luxe
 SEARCH_WAITING = {}  # chat_id -> topic_id
@@ -98,6 +106,7 @@ BASE_CATALOG = Path("catalog.json")
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 if not DATA_DIR.exists():
     DATA_DIR = Path(".")
+INDEX_OWNER_FILE = DATA_DIR / "index_owner_chat_id.txt"
 RUNTIME_CATALOG = DATA_DIR / "catalog_runtime.json"
 CATALOG_LOCK = RLock()
 
@@ -261,38 +270,149 @@ def _extract_response_text(payload):
                 pieces.append(content.get("text", ""))
     return " ".join(pieces).strip()
 
-def classify_brand_with_vision(m, topic_id):
-    """V5.7 GRATUIT : texte/caption + marques et modèles connus, sans API payante."""
-    text = " ".join([str(m.get("caption") or ""), str(m.get("text") or "")]).strip()
-    if text.lower() == "/indexchaussures":
-        start_background_index(chat_id, "64")
-        start_background_index(chat_id, "3616")
-        return
 
+VISION_LABELS = {
+    # Homme / Femme
+    "TN": "Nike Air Max Plus TN sneakers",
+    "Nike": "Nike sneakers",
+    "Jordan": "Air Jordan sneakers",
+    "On Running": "On Running Cloud sneakers",
+    "ASICS": "ASICS Gel sneakers",
+    "New Balance": "New Balance sneakers",
+    "Adidas": "Adidas sneakers",
+    "Puma": "Puma sneakers",
+    "Salomon": "Salomon sneakers",
+    # Luxe
+    "Dior": "Dior sneakers B22 B30",
+    "Louis Vuitton": "Louis Vuitton sneakers LV Trainer",
+    "Hermès": "Hermes luxury sneakers",
+    "Prada": "Prada luxury sneakers",
+    "Chanel": "Chanel luxury sneakers",
+    "Gucci": "Gucci luxury sneakers",
+    "Balenciaga": "Balenciaga sneakers",
+    "Louboutin": "Christian Louboutin sneakers",
+}
+
+LUXURY_SET = {"Dior","Louis Vuitton","Hermès","Prada","Chanel","Gucci","Balenciaga","Louboutin"}
+REGULAR_SET = {"TN","Nike","Jordan","On Running","ASICS","New Balance","Adidas","Puma","Salomon"}
+
+def _get_local_vision():
+    """Charge CLIP localement uniquement quand une indexation image est lancée."""
+    global LOCAL_VISION
+    with LOCAL_VISION_LOCK:
+        if LOCAL_VISION is not None:
+            return LOCAL_VISION
+        print(f"VISION LOCALE ⏳ chargement {LOCAL_VISION_MODEL}", flush=True)
+        try:
+            from transformers import pipeline
+            LOCAL_VISION = pipeline(
+                "zero-shot-image-classification",
+                model=LOCAL_VISION_MODEL,
+                device=-1,
+            )
+            print("VISION LOCALE ✅ modèle chargé", flush=True)
+            return LOCAL_VISION
+        except Exception as e:
+            print("VISION LOCALE ❌ chargement:", repr(e), flush=True)
+            return None
+
+def _local_brand_from_image(m):
+    """
+    Analyse réellement les pixels de la photo/miniature vidéo.
+    Retourne (marque, score). Toutes les marques Homme/Femme + Luxe sont comparées ensemble.
+    """
+    file_id = _telegram_visual_file_id(m)
+    if not file_id:
+        return None, 0.0
+
+    raw, _mime = _download_telegram_file(file_id)
+    if not raw:
+        return None, 0.0
+
+    model = _get_local_vision()
+    if model is None:
+        return None, 0.0
+
+    try:
+        from PIL import Image
+        image = Image.open(io.BytesIO(raw)).convert("RGB")
+        labels = list(VISION_LABELS.values())
+        results = model(image, candidate_labels=labels)
+        if not results:
+            return None, 0.0
+        best = results[0]
+        label = best.get("label")
+        score = float(best.get("score") or 0.0)
+        reverse = {v: k for k, v in VISION_LABELS.items()}
+        brand = reverse.get(label)
+        print(f"VISION IMAGE 🔎 -> {brand} score={score:.3f}", flush=True)
+        if brand and score >= LOCAL_VISION_MIN_SCORE:
+            return brand, score
+    except Exception as e:
+        print("VISION IMAGE ERROR:", repr(e), flush=True)
+    return None, 0.0
+
+def classify_brand_with_vision(m, topic_id, force_image=False):
+    """
+    V5.18 :
+    - force_image=True : analyse réellement l'image avec CLIP local.
+    - sinon : texte/légende d'abord pour les nouveaux messages, puis image.
+    """
+    text = " ".join([str(m.get("caption") or ""), str(m.get("text") or "")]).strip()
+
+    if not force_image:
+        by_text = _canonical_brand_from_text(text, topic_id)
+        if by_text:
+            return by_text
+
+    by_image, score = _local_brand_from_image(m)
+    if by_image:
+        return by_image
+
+    # Dernier secours texte, même pendant l'indexation image.
     by_text = _canonical_brand_from_text(text, topic_id)
     return by_text or "Autres / À vérifier"
 
+def _brand_destination_topic(brand, original_topic):
+    """
+    Classe selon ce que montre la chaussure :
+    luxe -> topic logique 3616
+    classique -> topic logique 64
+    """
+    if brand in LUXURY_SET:
+        return "3616"
+    if brand in REGULAR_SET:
+        return "64"
+    return str(original_topic)
 
-def register_brand_message(m, topic_id, message_id, kind):
-    """Classe ou RECLASSE une photo/vidéo dans une seule marque."""
+def _remove_message_from_all_brand_buckets(message_id):
+    for tid, topic_map in BRAND_CATALOG.items():
+        for brand, ids in list(topic_map.items()):
+            if message_id in ids:
+                topic_map[brand] = [x for x in ids if x != message_id]
+
+def register_brand_message(m, topic_id, message_id, kind, force_image=False):
+    """Analyse puis reclasse une photo/vidéo dans Homme/Femme OU Luxe selon l'image."""
     if str(topic_id) not in BRAND_TOPIC_IDS or kind not in ("photo", "video"):
         return
-    brand = classify_brand_with_vision(m, topic_id)
+
+    brand = classify_brand_with_vision(m, topic_id, force_image=force_image)
+    dest_tid = _brand_destination_topic(brand, topic_id)
+
     with BRAND_LOCK:
-        topic_map = BRAND_CATALOG.setdefault(str(topic_id), {})
-
-        # Retire d'une ancienne marque pour éviter les doublons après reclassification.
-        for old_brand, old_ids in list(topic_map.items()):
-            if message_id in old_ids and old_brand != brand:
-                topic_map[old_brand] = [x for x in old_ids if x != message_id]
-
+        _remove_message_from_all_brand_buckets(message_id)
+        topic_map = BRAND_CATALOG.setdefault(dest_tid, {})
         ids = topic_map.setdefault(brand, [])
         if message_id not in ids:
             ids.append(message_id)
             ids.sort()
         save_brands()
 
-    print(f"MARQUE ✅ topic={topic_id} message={message_id} -> {brand}", flush=True)
+    print(
+        f"MARQUE IMAGE ✅ origine={topic_id} destination={dest_tid} "
+        f"message={message_id} -> {brand}",
+        flush=True
+    )
 
 def register_new_content(m):
     """Ajoute automatiquement les NOUVEAUX textes, photos et vidéos du forum source."""
@@ -805,6 +925,26 @@ def send_page(chat_id, tid, offset=0):
         text=f"✅ <b>{end} / {total} éléments affichés</b>",
         parse_mode="HTML", reply_markup={"inline_keyboard":rows})
 
+
+def _index_owner_ok(chat_id):
+    """Premier utilisateur qui lance /indeximages devient propriétaire de l'indexation."""
+    try:
+        if INDEX_OWNER_FILE and INDEX_OWNER_FILE.exists():
+            return INDEX_OWNER_FILE.read_text(encoding="utf-8").strip() == str(chat_id)
+        if INDEX_OWNER_FILE:
+            INDEX_OWNER_FILE.parent.mkdir(parents=True, exist_ok=True)
+            INDEX_OWNER_FILE.write_text(str(chat_id), encoding="utf-8")
+        return True
+    except Exception:
+        return True
+
+def _clear_previous_shoe_index():
+    """Supprime les anciens classements chaussures avant une analyse complète."""
+    with BRAND_LOCK:
+        BRAND_CATALOG["64"] = {}
+        BRAND_CATALOG["3616"] = {}
+        save_brands()
+
 def handle(u):
     # Telegram can deliver group content as message/edited_message/channel_post.
     m = (
@@ -848,6 +988,27 @@ def handle(u):
                 ]}
             )
 
+        if txt.startswith("/indeximages"):
+            if not _index_owner_ok(chat_id):
+                return api("sendMessage", chat_id=chat_id, text="⛔ Cette commande est réservée au propriétaire du catalogue.")
+            _clear_previous_shoe_index()
+            api(
+                "sendMessage",
+                chat_id=chat_id,
+                text=(
+                    "🧠 <b>Analyse complète des chaussures lancée</b>\n\n"
+                    "Je vais analyser les pixels de toutes les photos/miniatures accessibles dans :\n"
+                    "• Chaussures Homme / Femme\n"
+                    "• Chaussures de luxe\n\n"
+                    "Dior/LV/etc. seront rangées dans Luxe ; TN/Nike/ASICS/etc. dans Homme/Femme.\n"
+                    "Les résultats sont sauvegardés pour rendre les recherches instantanées ensuite."
+                ),
+                parse_mode="HTML"
+            )
+            start_background_index(chat_id, "64", force_image=True, silent_start=True)
+            start_background_index(chat_id, "3616", force_image=True, silent_start=True)
+            return
+
         if txt.startswith("/cancel"):
             SEARCH_WAITING.pop(chat_id, None)
             return api("sendMessage", chat_id=chat_id, text="✅ Recherche annulée.")
@@ -863,7 +1024,7 @@ def handle(u):
                 text=(
                     "✅ <b>Détection automatique active</b>\n"
                     "📝 Textes + 📷 Photos + 🎬 Vidéos\n"
-                    "🆓 Classement marques : GRATUIT (textes + légendes + modèles connus)\n"
+                    "🧠 Classement marques : VISION LOCALE GRATUITE + cache\n"
                     f"📡 Source : <code>{SOURCE_CHAT}</code>\n"
                     f"💾 Sauvegarde persistante : {'oui' if runtime else 'à initialiser au 1er ajout'}"
                 ),
@@ -946,52 +1107,98 @@ def handle(u):
         return send_page(chat_id, tid, int(off))
 
 
-def start_background_index(chat_id, tid):
-    """Indexe une seule fois les anciens messages; les recherches restent instantanées."""
+
+def start_background_index(chat_id, tid, force_image=False, silent_start=False):
+    """
+    Indexe les anciens médias.
+    force_image=True = analyse réellement chaque image avec le modèle local.
+    """
     tid = str(tid)
     with INDEXING_LOCK:
         if tid in INDEXING_TOPICS:
-            return api("sendMessage", chat_id=chat_id, text="⏳ Indexation déjà en cours.")
+            if not silent_start:
+                return api("sendMessage", chat_id=chat_id, text="⏳ Indexation déjà en cours.")
+            return None
         INDEXING_TOPICS.add(tid)
         CANCEL_SCAN_TOPICS.discard(tid)
 
     def worker():
         classified = 0
+        media_seen = 0
+        errors = 0
         try:
             ids = list(reversed((CATALOG.get(tid) or {}).get("message_ids", [])))
-            already = _already_classified_ids(tid)
-            for source_message_id in ids:
+            total_ids = len(ids)
+            print(f"INDEX IMAGE ▶ topic={tid} ids={total_ids} force={force_image}", flush=True)
+
+            for pos, source_message_id in enumerate(ids, start=1):
                 with INDEXING_LOCK:
                     if tid in CANCEL_SCAN_TOPICS:
-                        api("sendMessage", chat_id=chat_id, text="⛔ Indexation arrêtée.")
+                        api("sendMessage", chat_id=chat_id, text=f"⛔ Indexation {tid} arrêtée.")
                         return
-                if source_message_id in already:
-                    continue
-                fr = api("forwardMessage", chat_id=chat_id, from_chat_id=SOURCE_CHAT,
-                         message_id=source_message_id, disable_notification=True)
+
+                fr = api(
+                    "forwardMessage",
+                    chat_id=chat_id,
+                    from_chat_id=SOURCE_CHAT,
+                    message_id=source_message_id,
+                    disable_notification=True
+                )
                 if not fr.get("ok"):
+                    errors += 1
                     continue
+
                 forwarded = fr.get("result") or {}
                 temp_id = forwarded.get("message_id")
                 try:
                     kind = message_kind(forwarded)
                     if kind in ("photo", "video"):
-                        register_brand_message(forwarded, tid, source_message_id, kind)
+                        media_seen += 1
+                        register_brand_message(
+                            forwarded, tid, source_message_id, kind,
+                            force_image=force_image
+                        )
                         classified += 1
+                except Exception as e:
+                    errors += 1
+                    print("INDEX IMAGE item error:", source_message_id, repr(e), flush=True)
                 finally:
                     if temp_id:
                         api("deleteMessage", chat_id=chat_id, message_id=temp_id)
-            api("sendMessage", chat_id=chat_id,
-                text=f"✅ Indexation terminée : {classified} médias traités. Les recherches sont maintenant instantanées.")
+
+                if media_seen and media_seen % 25 == 0:
+                    print(
+                        f"INDEX IMAGE … topic={tid} medias={media_seen} "
+                        f"progress={pos}/{total_ids}",
+                        flush=True
+                    )
+                    time.sleep(0.15)
+
+            api(
+                "sendMessage",
+                chat_id=chat_id,
+                text=(
+                    f"✅ Analyse terminée pour {'Homme/Femme' if tid == '64' else 'Luxe'} : "
+                    f"{classified} médias analysés.\n"
+                    "Les résultats sont maintenant enregistrés dans le cache."
+                )
+            )
         finally:
             with INDEXING_LOCK:
                 INDEXING_TOPICS.discard(tid)
                 CANCEL_SCAN_TOPICS.discard(tid)
 
     threading.Thread(target=worker, daemon=True).start()
-    return api("sendMessage", chat_id=chat_id,
-        text="⚡ Indexation lancée en arrière-plan. Tu peux continuer à utiliser le bot.",
-        reply_markup={"inline_keyboard":[[{"text":"⛔ Arrêter l’indexation","callback_data":f"cancelscan:{tid}"}]]})
+    if silent_start:
+        return None
+    return api(
+        "sendMessage",
+        chat_id=chat_id,
+        text="🧠 Analyse image lancée en arrière-plan.",
+        reply_markup={"inline_keyboard":[[
+            {"text":"⛔ Arrêter l’indexation","callback_data":f"cancelscan:{tid}"}
+        ]]}
+    )
 
 def poll():
     offset=0
@@ -1014,10 +1221,11 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: index export complet + recherche instantanée = ACTIVÉ", flush=True)
-    print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: vision locale images + reclassement Homme/Femme/Luxe = ACTIVÉ", flush=True)
+    print("MODE GRATUIT: VISION LOCALE CLIP + CACHE = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)
+    print(f"MODÈLE LOCAL: {LOCAL_VISION_MODEL}", flush=True)
     threading.Thread(target=poll,daemon=True).start()
     port=int(os.environ.get("PORT","8080"))
     app.run(host="0.0.0.0",port=port,threaded=True)
