@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.16-DIRECT-BRANDS"
+BUILD_VERSION = "V5.17-EXPORT-INDEX"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -526,30 +526,13 @@ def group_keyboard(group_id):
 
 def brand_keyboard(tid):
     tid = str(tid)
-    allowed = REGULAR_BRANDS if tid == "64" else LUXURY_BRANDS
-    rows = [
-        [{"text": "🔎 RECHERCHER une marque / un modèle", "callback_data": f"searchbrand:{tid}"}],
-        [{"text": "👟 Tous les modèles", "callback_data": f"cat:{tid}:0"}],
-    ]
-    topic_map = BRAND_CATALOG.get(tid, {})
-
-    # 2 marques par ligne pour aller plus vite
-    current = []
-    for idx, brand in enumerate(allowed):
-        count = len(topic_map.get(brand, []))
-        current.append({
-            "text": f"{brand} · {count}",
-            "callback_data": f"brand:{tid}:{idx}:0"
-        })
-        if len(current) == 2:
-            rows.append(current)
-            current = []
-    if current:
-        rows.append(current)
-
-    rows.append([{"text":"⬅️ Chaussures","callback_data":"group:shoes"}])
-    rows.append([{"text":"🏠 Accueil","callback_data":"home"}])
-    return {"inline_keyboard": rows}
+    label = "Homme / Femme" if tid == "64" else "Luxe"
+    return {"inline_keyboard":[
+        [{"text":f"🔎 Rechercher dans {label}","callback_data":f"searchbrand:{tid}"}],
+        [{"text":"👟 Voir tous les modèles","callback_data":f"cat:{tid}:0"}],
+        [{"text":"⬅️ Retour","callback_data":"group:shoes"}],
+        [{"text":"🏠 Accueil","callback_data":"home"}]
+    ]}
 
 def send_brand_root(chat_id, tid):
     tid = str(tid)
@@ -1031,7 +1014,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: TN direct + menus simplifiés + cache pré-indexé = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: index export complet + recherche instantanée = ACTIVÉ", flush=True)
     print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)

@@ -1,13 +1,21 @@
-# V5.16 — MARQUES DIRECTES / RAPIDES
+# V5.17 — INDEX EXPORT COMPLET
 
-- Homme/Femme simplifié : TN, Nike, Jordan, On Running, ASICS, New Balance, Adidas, Puma, Salomon.
-- Luxe simplifié : Dior, Louis Vuitton, Hermès, Prada, Chanel, Gucci, Balenciaga, Louboutin.
-- `TN` est maintenant une catégorie propre : taper TN affiche seulement les TN indexées.
-- Recherche = cache immédiat, aucun scan Telegram au moment où le client tape une marque.
-- `brand_catalog.json` est déjà pré-indexé à partir de l'export Telegram fourni.
+Cette version exploite directement ton `result(2).json`.
 
-IMPORTANT : cette version gratuite classe les anciennes publications à partir de leur texte/légende.
-La reconnaissance d'une marque uniquement à partir des pixels d'une photo nécessite un moteur de vision.
+## Changement interface
+- plus de grosse grille de marques ;
+- Homme/Femme : `🔎 Rechercher dans Homme / Femme` + `👟 Voir tous les modèles`;
+- Luxe : `🔎 Rechercher dans Luxe` + `👟 Voir tous les modèles`.
+
+## Vitesse
+Aucun scan n'est lancé quand le client tape `TN`, `Dior`, `ASICS`, etc.
+La réponse vient directement du cache `brand_catalog.json`.
+
+## Index trouvé dans l'export
+Homme/Femme : {'TN': 1}
+Luxe : {'Chanel': 1, 'Hermès': 1, 'Prada': 1, 'Dior': 1, 'Louis Vuitton': 1}
+
+Limite gratuite : les anciennes photos sans texte/légende/modèle identifiable ne peuvent pas être reconnues uniquement par leurs pixels.
 
 Log Railway :
-`AUTO V5.16-DIRECT-BRANDS: TN direct + menus simplifiés + cache pré-indexé = ACTIVÉ`
+`AUTO V5.17-EXPORT-INDEX: index export complet + recherche instantanée = ACTIVÉ`
