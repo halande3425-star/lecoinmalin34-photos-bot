@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.4-SEARCH-ARTICLES"
+BUILD_VERSION = "V5.5-VISION-BRANDS"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -22,14 +22,17 @@ SEARCH_WAITING = {}  # chat_id -> topic_id
 
 REGULAR_BRANDS = [
     "Nike", "New Balance", "On Running", "Adidas", "ASICS", "Jordan",
-    "Puma", "Salomon", "UGG", "Crocs", "Reebok", "Converse",
-    "Lacoste", "Autres / À vérifier"
+    "Puma", "Salomon", "UGG", "Crocs", "Reebok", "Converse", "Lacoste",
+    "Vans", "Skechers", "Hoka", "Saucony", "Mizuno", "Under Armour",
+    "Veja", "Timberland", "Autres / À vérifier"
 ]
 LUXURY_BRANDS = [
     "Dior", "Louis Vuitton", "Prada", "Chanel", "Hermès", "Gucci",
     "Balenciaga", "Louboutin", "Versace", "Valentino", "Givenchy",
     "Moncler", "Fendi", "Bottega Veneta", "Alexander McQueen",
-    "Dolce & Gabbana", "Burberry", "Loewe", "Autres / À vérifier"
+    "Dolce & Gabbana", "Burberry", "Loewe", "Amiri", "Miu Miu",
+    "Maison Margiela", "Rick Owens", "Golden Goose", "Off-White",
+    "Autres / À vérifier"
 ]
 
 
@@ -44,6 +47,9 @@ SEARCH_ALIASES = {
         "salomon": "Salomon", "ugg": "UGG", "crocs": "Crocs",
         "reebok": "Reebok", "converse": "Converse", "lacoste": "Lacoste",
         "puma": "Puma", "adidas": "Adidas", "nike": "Nike", "asics": "ASICS",
+        "vans": "Vans", "skechers": "Skechers", "hoka": "Hoka",
+        "saucony": "Saucony", "mizuno": "Mizuno", "under armour": "Under Armour",
+        "veja": "Veja", "timberland": "Timberland",
     },
     "3616": {
         "b22": "Dior", "b30": "Dior", "dior": "Dior",
@@ -56,6 +62,9 @@ SEARCH_ALIASES = {
         "mcqueen": "Alexander McQueen", "alexander mcqueen": "Alexander McQueen",
         "dolce": "Dolce & Gabbana", "gabbana": "Dolce & Gabbana", "d&g": "Dolce & Gabbana",
         "burberry": "Burberry", "loewe": "Loewe",
+        "amiri": "Amiri", "miu miu": "Miu Miu", "margiela": "Maison Margiela",
+        "maison margiela": "Maison Margiela", "rick owens": "Rick Owens",
+        "golden goose": "Golden Goose", "off white": "Off-White", "off-white": "Off-White",
     }
 }
 
@@ -184,7 +193,9 @@ def _canonical_brand_from_text(text, topic_id):
         (["asics", "gel-kayano", "gel nyc"], "ASICS"),
         (["puma"], "Puma"), (["salomon"], "Salomon"), (["ugg"], "UGG"),
         (["crocs"], "Crocs"), (["reebok"], "Reebok"), (["converse"], "Converse"),
-        (["lacoste"], "Lacoste"),
+        (["lacoste"], "Lacoste"), (["vans"], "Vans"), (["skechers"], "Skechers"),
+        (["hoka"], "Hoka"), (["saucony"], "Saucony"), (["mizuno"], "Mizuno"),
+        (["under armour"], "Under Armour"), (["veja"], "Veja"), (["timberland"], "Timberland"),
         (["dior", "b22", "b30"], "Dior"),
         (["louis vuitton", " lv ", "lv runner"], "Louis Vuitton"),
         (["prada", "prada cup"], "Prada"),
@@ -196,6 +207,10 @@ def _canonical_brand_from_text(text, topic_id):
         (["bottega"], "Bottega Veneta"), (["mcqueen", "alexander mcqueen"], "Alexander McQueen"),
         (["dolce", "gabbana", "d&g"], "Dolce & Gabbana"),
         (["burberry"], "Burberry"), (["loewe"], "Loewe"),
+        (["amiri"], "Amiri"), (["miu miu"], "Miu Miu"),
+        (["margiela", "maison margiela"], "Maison Margiela"),
+        (["rick owens"], "Rick Owens"), (["golden goose"], "Golden Goose"),
+        (["off-white", "off white"], "Off-White"),
     ]
     allowed = REGULAR_BRANDS if str(topic_id) == "64" else LUXURY_BRANDS
     padded = f" {t} "
@@ -312,16 +327,24 @@ def classify_brand_with_vision(m, topic_id):
     return "Autres / À vérifier"
 
 def register_brand_message(m, topic_id, message_id, kind):
+    """Classe ou RECLASSE une photo/vidéo dans une seule marque."""
     if str(topic_id) not in BRAND_TOPIC_IDS or kind not in ("photo", "video"):
         return
     brand = classify_brand_with_vision(m, topic_id)
     with BRAND_LOCK:
         topic_map = BRAND_CATALOG.setdefault(str(topic_id), {})
+
+        # Retire d'une ancienne marque pour éviter les doublons après reclassification.
+        for old_brand, old_ids in list(topic_map.items()):
+            if message_id in old_ids and old_brand != brand:
+                topic_map[old_brand] = [x for x in old_ids if x != message_id]
+
         ids = topic_map.setdefault(brand, [])
         if message_id not in ids:
             ids.append(message_id)
             ids.sort()
-            save_brands()
+        save_brands()
+
     print(f"MARQUE ✅ topic={topic_id} message={message_id} -> {brand}", flush=True)
 
 def register_new_content(m):
@@ -354,6 +377,9 @@ def register_new_content(m):
         c = CATALOG[key]
         ids = c.setdefault("message_ids", [])
         if message_id in ids:
+            # Une ancienne publication modifiée/reçue de nouveau peut être reclassée par vision.
+            if key in BRAND_TOPIC_IDS and kind in ("photo", "video"):
+                register_brand_message(m, key, message_id, kind)
             return False
 
         ids.append(message_id)
@@ -834,7 +860,8 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: RECHERCHE VISIBLE Homme/Femme + Luxe + Articles sur place = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: détection images + recherche marques Homme/Femme & Luxe = ACTIVÉ", flush=True)
+    print("VISION DETECTION: " + ("ACTIVÉE" if OPENAI_API_KEY else "CLÉ OPENAI MANQUANTE"), flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print(f"VISION MARQUES: {'ACTIVÉ' if OPENAI_API_KEY else 'OPENAI_API_KEY MANQUANTE'} ({VISION_MODEL})", flush=True)
     threading.Thread(target=poll,daemon=True).start()
