@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.14-INSTANT-CACHE"
+BUILD_VERSION = "V5.15-FIX-CACHE"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -269,6 +269,11 @@ def _extract_response_text(payload):
 def classify_brand_with_vision(m, topic_id):
     """V5.7 GRATUIT : texte/caption + marques et modèles connus, sans API payante."""
     text = " ".join([str(m.get("caption") or ""), str(m.get("text") or "")]).strip()
+    if text.lower() == "/indexchaussures":
+        start_background_index(chat_id, "64")
+        start_background_index(chat_id, "3616")
+        return
+
     by_text = _canonical_brand_from_text(text, topic_id)
     return by_text or "Autres / À vérifier"
 
@@ -865,10 +870,6 @@ def handle(u):
                 ]}
             )
 
-        if text.lower() == "/indexchaussures":
-            start_background_index(chat_id, "64")
-            return start_background_index(chat_id, "3616")
-
         if txt.startswith("/cancel"):
             SEARCH_WAITING.pop(chat_id, None)
             return api("sendMessage", chat_id=chat_id, text="✅ Recherche annulée.")
@@ -1035,7 +1036,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: recherche CACHE instantanée + indexation arrière-plan = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: cache instantané + /indexchaussures FIXÉ = ACTIVÉ", flush=True)
     print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)

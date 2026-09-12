@@ -1,13 +1,12 @@
-# V5.14 — RECHERCHE INSTANTANÉE
+# V5.15 — FIX CACHE
 
-- Dior / Nike / On Running / ASICS : la recherche lit directement le cache, donc aucun scan au moment de la recherche.
-- `/indexchaussures` lance une seule indexation des anciens messages Homme/Femme + Luxe en arrière-plan.
-- Les nouveaux articles continuent d'être ajoutés automatiquement au cache.
-- Bouton d'arrêt de l'indexation conservé.
-- 100 % gratuit : classement via texte/légende/modèles connus.
+Correction de l'erreur Railway :
+`Polling: NameError("name 'text' is not defined")`
 
-Après déploiement, envoie `/indexchaussures` UNE fois et laisse l'indexation finir.
-Ensuite les recherches sont instantanées.
+- `/indexchaussures` est maintenant traité dans le contexte du message Telegram.
+- Les recherches clients restent basées sur le cache et ne lancent plus de scan.
+- `/indexchaussures` lance l'indexation Homme/Femme + Luxe une seule fois en arrière-plan.
+- Le bouton d'arrêt reste disponible.
 
 Log attendu :
-`AUTO V5.14-INSTANT-CACHE: recherche CACHE instantanée + indexation arrière-plan = ACTIVÉ`
+`AUTO V5.15-FIX-CACHE: cache instantané + /indexchaussures FIXÉ = ACTIVÉ`
