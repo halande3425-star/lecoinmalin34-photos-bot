@@ -1,21 +1,18 @@
-# LE COIN MALIN 34 — V5.5 DÉTECTION DES MARQUES
+# LE COIN MALIN 34 — V5.7 GRATUIT
 
-Cette version classe automatiquement les NOUVELLES photos/vidéos des deux rubriques :
-- `Chaussures homme/femme` (topic 64)
-- `Chaussures de luxe` (topic 3616)
+Aucun paiement OpenAI nécessaire.
 
-La recherche `Dior`, `Hermès`, `ASICS`, `Nike`, etc. renvoie ensuite uniquement les médias classés dans cette marque.
+Classement par :
+- texte et légende des publications ;
+- marques ;
+- modèles/alias connus : TN → Nike, B30 → Dior, LV Runner → Louis Vuitton, etc.
 
-## Important
-Pour reconnaître une marque uniquement depuis l'image, Railway doit avoir la variable :
-`OPENAI_API_KEY`
+Fonctionne pour Chaussures Homme/Femme et Chaussures de luxe.
+Le bot peut aussi parcourir les anciens messages accessibles et indexer gratuitement leurs légendes.
 
-Dans les logs Railway, vérifier :
-`VISION DETECTION: ACTIVÉE`
+Limite : une photo sans aucun texte/légende ne peut pas être reconnue uniquement par son image sans moteur de vision.
 
-Les anciens médias déjà présents avant que le bot les reçoive ne peuvent pas être relus automatiquement par le Bot API Telegram. Ils peuvent être classés si :
-- ils sont modifiés/republiés et donc reçus de nouveau par le bot, ou
-- on refait un export Telegram avec les médias pour une migration complète.
-
-## Log attendu
-`AUTO V5.5-VISION-BRANDS: détection images + recherche marques Homme/Femme & Luxe = ACTIVÉ`
+Logs attendus :
+AUTO V5.7-FREE: classement GRATUIT Homme/Femme + Luxe + recherche = ACTIVÉ
+MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ
+OPENAI API: NON UTILISÉE

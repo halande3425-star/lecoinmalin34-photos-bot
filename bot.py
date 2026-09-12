@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.5-VISION-BRANDS"
+BUILD_VERSION = "V5.7-FREE"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -19,6 +19,8 @@ VISION_MODEL = os.environ.get("VISION_MODEL", "gpt-5.6-luna").strip()
 
 BRAND_TOPIC_IDS = {"64", "3616"}  # Chaussures Homme/Femme + Chaussures de luxe
 SEARCH_WAITING = {}  # chat_id -> topic_id
+INDEXING_TOPICS = set()
+INDEXING_LOCK = threading.RLock()
 
 REGULAR_BRANDS = [
     "Nike", "New Balance", "On Running", "Adidas", "ASICS", "Jordan",
@@ -264,67 +266,11 @@ def _extract_response_text(payload):
     return " ".join(pieces).strip()
 
 def classify_brand_with_vision(m, topic_id):
-    """Reconnaît la marque sur la photo ou sur la miniature de la vidéo."""
-    text = (m.get("caption") or m.get("text") or "").strip()
+    """V5.7 GRATUIT : texte/caption + marques et modèles connus, sans API payante."""
+    text = " ".join([str(m.get("caption") or ""), str(m.get("text") or "")]).strip()
     by_text = _canonical_brand_from_text(text, topic_id)
-    if by_text:
-        return by_text
+    return by_text or "Autres / À vérifier"
 
-    allowed = REGULAR_BRANDS if str(topic_id) == "64" else LUXURY_BRANDS
-    if not OPENAI_API_KEY:
-        print("VISION: OPENAI_API_KEY absente -> Autres / À vérifier", flush=True)
-        return "Autres / À vérifier"
-
-    file_id = _telegram_visual_file_id(m)
-    raw, mime = _download_telegram_file(file_id)
-    if not raw:
-        return "Autres / À vérifier"
-
-    import base64
-    data_url = f"data:{mime};base64," + base64.b64encode(raw).decode("ascii")
-    prompt = (
-        "Tu classes une chaussure pour un catalogue Telegram. "
-        "Observe uniquement la paire visible et identifie sa marque. "
-        "Réponds avec UNE SEULE valeur exactement parmi cette liste : "
-        + " | ".join(allowed)
-        + ". Si le logo/modèle n'est pas suffisamment fiable, réponds exactement Autres / À vérifier. "
-        "Ne devine pas."
-    )
-    try:
-        r = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": VISION_MODEL,
-                "input": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": prompt},
-                        {"type": "input_image", "image_url": data_url, "detail": "low"},
-                    ],
-                }],
-                "max_output_tokens": 40,
-            },
-            timeout=90,
-        )
-        payload = r.json()
-        if not r.ok:
-            print("VISION API ERROR:", payload, flush=True)
-            return "Autres / À vérifier"
-        answer = _extract_response_text(payload).strip()
-        for brand in allowed:
-            if answer.casefold() == brand.casefold():
-                return brand
-        # Tolérance si le modèle ajoute un peu de texte.
-        for brand in allowed:
-            if brand.casefold() in answer.casefold():
-                return brand
-    except Exception as e:
-        print("VISION error:", repr(e), flush=True)
-    return "Autres / À vérifier"
 
 def register_brand_message(m, topic_id, message_id, kind):
     """Classe ou RECLASSE une photo/vidéo dans une seule marque."""
@@ -632,7 +578,149 @@ def send_brand_root(chat_id, tid):
         reply_markup=brand_keyboard(tid)
     )
 
-def send_brand_page(chat_id, tid, brand_index, offset=0):
+
+def _already_classified_ids(tid):
+    """Tous les IDs déjà classés, toutes marques confondues."""
+    topic_map = BRAND_CATALOG.get(str(tid), {})
+    out = set()
+    for ids in topic_map.values():
+        for mid in ids:
+            if isinstance(mid, int):
+                out.add(mid)
+    return out
+
+def _scan_old_topic_for_brand(chat_id, tid, target_brand, brand_index):
+    """
+    Récupère les anciens messages grâce à forwardMessage, analyse leur image,
+    puis supprime immédiatement la copie temporaire du chat privé.
+    Le scan s'arrête après 20 résultats de la marque recherchée ou à la fin.
+    """
+    tid = str(tid)
+    try:
+        ids = list((CATALOG.get(tid) or {}).get("message_ids", []))
+        already = _already_classified_ids(tid)
+        found_before = len(BRAND_CATALOG.get(tid, {}).get(target_brand, []))
+        scanned_media = 0
+        checked = 0
+
+        print(
+            f"SCAN HISTORIQUE ▶ topic={tid} marque={target_brand} "
+            f"ids={len(ids)} deja_classes={len(already)}",
+            flush=True
+        )
+
+        for source_message_id in ids:
+            if source_message_id in already:
+                # Si on a déjà assez de résultats pour cette marque, inutile d'aller plus loin.
+                if len(BRAND_CATALOG.get(tid, {}).get(target_brand, [])) >= 20:
+                    break
+                continue
+
+            checked += 1
+            fr = api(
+                "forwardMessage",
+                chat_id=chat_id,
+                from_chat_id=SOURCE_CHAT,
+                message_id=source_message_id,
+                disable_notification=True
+            )
+            if not fr.get("ok"):
+                continue
+
+            forwarded = fr.get("result") or {}
+            temp_id = forwarded.get("message_id")
+            try:
+                kind = message_kind(forwarded)
+                if kind in ("photo", "video"):
+                    scanned_media += 1
+                    register_brand_message(forwarded, tid, source_message_id, kind)
+                    already.add(source_message_id)
+            finally:
+                if temp_id:
+                    api("deleteMessage", chat_id=chat_id, message_id=temp_id)
+
+            # Dès qu'on a une page complète de la marque demandée, on peut répondre.
+            if len(BRAND_CATALOG.get(tid, {}).get(target_brand, [])) >= 20:
+                break
+
+            # Petite pause pour éviter de brusquer Telegram.
+            time.sleep(0.12)
+
+        total_found = len(BRAND_CATALOG.get(tid, {}).get(target_brand, []))
+        print(
+            f"SCAN HISTORIQUE ✅ topic={tid} marque={target_brand} "
+            f"messages_testes={checked} medias_analyses={scanned_media} trouves={total_found}",
+            flush=True
+        )
+
+        if total_found > 0:
+            api(
+                "sendMessage",
+                chat_id=chat_id,
+                text=(
+                    f"✅ <b>{target_brand}</b> trouvé. "
+                    f"J’ai classé les anciennes photos disponibles et je t’affiche les résultats 👇"
+                ),
+                parse_mode="HTML"
+            )
+            send_brand_page(chat_id, tid, brand_index, 0, allow_scan=False)
+        else:
+            api(
+                "sendMessage",
+                chat_id=chat_id,
+                text=(
+                    f"🔎 Scan terminé pour <b>{target_brand}</b>.\n\n"
+                    "Je n’ai trouvé aucune photo identifiable de cette marque "
+                    "dans les anciens messages accessibles."
+                ),
+                parse_mode="HTML",
+                reply_markup={"inline_keyboard":[
+                    [{"text":"⬅️ Marques","callback_data":f"brandroot:{tid}"}],
+                    [{"text":"🏠 Accueil","callback_data":"home"}]
+                ]}
+            )
+    except Exception as e:
+        print("SCAN HISTORIQUE ERROR:", repr(e), flush=True)
+        api(
+            "sendMessage",
+            chat_id=chat_id,
+            text="⚠️ Le scan des anciennes chaussures a rencontré une erreur. Regarde les logs Railway.",
+        )
+    finally:
+        with INDEXING_LOCK:
+            INDEXING_TOPICS.discard(tid)
+
+def start_old_brand_scan(chat_id, tid, target_brand, brand_index):
+    tid = str(tid)
+
+    with INDEXING_LOCK:
+        if tid in INDEXING_TOPICS:
+            return api(
+                "sendMessage",
+                chat_id=chat_id,
+                text="⏳ Je suis déjà en train d’analyser les anciennes chaussures de cette rubrique. Réessaie dans quelques instants."
+            )
+        INDEXING_TOPICS.add(tid)
+
+    api(
+        "sendMessage",
+        chat_id=chat_id,
+        text=(
+            f"🔎 <b>{target_brand}</b>\n\n"
+            "Je scanne maintenant les anciens messages et leurs textes/légendes.\n"
+            "Les copies temporaires sont supprimées automatiquement. C’est 100 % gratuit.\n\n"
+            "⏳ Je t’envoie les résultats dès que j’en trouve."
+        ),
+        parse_mode="HTML"
+    )
+    threading.Thread(
+        target=_scan_old_topic_for_brand,
+        args=(chat_id, tid, target_brand, brand_index),
+        daemon=True
+    ).start()
+    return None
+
+def send_brand_page(chat_id, tid, brand_index, offset=0, allow_scan=True):
     tid = str(tid)
     allowed = REGULAR_BRANDS if tid == "64" else LUXURY_BRANDS
     if brand_index < 0 or brand_index >= len(allowed):
@@ -641,13 +729,15 @@ def send_brand_page(chat_id, tid, brand_index, offset=0):
     ids = BRAND_CATALOG.get(tid, {}).get(brand, [])
     total = len(ids)
     if total == 0:
+        if allow_scan and tid in BRAND_TOPIC_IDS:
+            return start_old_brand_scan(chat_id, tid, brand, brand_index)
         return api(
             "sendMessage",
             chat_id=chat_id,
-            text=f"👟 <b>{brand}</b>\n\nAucun article classé dans cette marque pour le moment.",
+            text=f"👟 <b>{brand}</b>\n\nAucun article identifié dans cette marque après analyse.",
             parse_mode="HTML",
             reply_markup={"inline_keyboard":[
-                [{"text":"⬅️ Retour","callback_data":("articlesplace" if tid == "2" else f"brandroot:{tid}")}],
+                [{"text":"⬅️ Marques","callback_data":f"brandroot:{tid}"}],
                 [{"text":"🏠 Accueil","callback_data":"home"}]
             ]}
         )
@@ -765,7 +855,7 @@ def handle(u):
                 text=(
                     "✅ <b>Détection automatique active</b>\n"
                     "📝 Textes + 📷 Photos + 🎬 Vidéos\n"
-                    f"🤖 Classement marques : {'ACTIF' if OPENAI_API_KEY else 'clé IA manquante'}\n"
+                    "🆓 Classement marques : GRATUIT (textes + légendes + modèles connus)\n"
                     f"📡 Source : <code>{SOURCE_CHAT}</code>\n"
                     f"💾 Sauvegarde persistante : {'oui' if runtime else 'à initialiser au 1er ajout'}"
                 ),
@@ -860,10 +950,10 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: détection images + recherche marques Homme/Femme & Luxe = ACTIVÉ", flush=True)
-    print("VISION DETECTION: " + ("ACTIVÉE" if OPENAI_API_KEY else "CLÉ OPENAI MANQUANTE"), flush=True)
+    print(f"AUTO {BUILD_VERSION}: classement GRATUIT Homme/Femme + Luxe + recherche = ACTIVÉ", flush=True)
+    print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
-    print(f"VISION MARQUES: {'ACTIVÉ' if OPENAI_API_KEY else 'OPENAI_API_KEY MANQUANTE'} ({VISION_MODEL})", flush=True)
+    print("OPENAI API: NON UTILISÉE", flush=True)
     threading.Thread(target=poll,daemon=True).start()
     port=int(os.environ.get("PORT","8080"))
     app.run(host="0.0.0.0",port=port,threaded=True)
