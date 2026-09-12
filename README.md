@@ -1,14 +1,13 @@
-# V5.13 — TOUS LES RÉSULTATS + RAPIDE + CANCEL
+# V5.14 — RECHERCHE INSTANTANÉE
 
-Objectif :
-- `Dior` → tous les Dior trouvés dans la tranche scannée ;
-- même fonctionnement pour Nike, ASICS, Hermès, Louis Vuitton, etc. ;
-- scan par passage limité à 250 messages récents pour éviter les attentes interminables ;
-- aucune pause longue ;
-- vérification de l'annulation avant et après chaque récupération Telegram ;
-- bouton `⛔ Annuler le scan` conservé et rendu plus réactif.
+- Dior / Nike / On Running / ASICS : la recherche lit directement le cache, donc aucun scan au moment de la recherche.
+- `/indexchaussures` lance une seule indexation des anciens messages Homme/Femme + Luxe en arrière-plan.
+- Les nouveaux articles continuent d'être ajoutés automatiquement au cache.
+- Bouton d'arrêt de l'indexation conservé.
+- 100 % gratuit : classement via texte/légende/modèles connus.
 
-Version gratuite : classement à partir du texte, de la légende et des modèles/alias connus.
+Après déploiement, envoie `/indexchaussures` UNE fois et laisse l'indexation finir.
+Ensuite les recherches sont instantanées.
 
-Log Railway attendu :
-`AUTO V5.13-BATCH-CANCEL: TOUS résultats + lots rapides + CANCEL fonctionnel = ACTIVÉ`
+Log attendu :
+`AUTO V5.14-INSTANT-CACHE: recherche CACHE instantanée + indexation arrière-plan = ACTIVÉ`

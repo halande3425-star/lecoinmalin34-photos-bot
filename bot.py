@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.13-BATCH-CANCEL"
+BUILD_VERSION = "V5.14-INSTANT-CACHE"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -756,12 +756,10 @@ def send_brand_page(chat_id, tid, brand_index, offset=0, allow_scan=True):
     ids = BRAND_CATALOG.get(tid, {}).get(brand, [])
     total = len(ids)
     if total == 0:
-        if allow_scan and tid in BRAND_TOPIC_IDS:
-            return start_old_brand_scan(chat_id, tid, brand, brand_index)
         return api(
             "sendMessage",
             chat_id=chat_id,
-            text=f"👟 <b>{brand}</b>\n\nAucun article identifié dans cette marque après analyse.",
+            text=f"👟 <b>{brand}</b>\n\nAucun article indexé dans cette marque pour le moment.",
             parse_mode="HTML",
             reply_markup={"inline_keyboard":[
                 [{"text":"⬅️ Marques","callback_data":f"brandroot:{tid}"}],
@@ -867,6 +865,10 @@ def handle(u):
                 ]}
             )
 
+        if text.lower() == "/indexchaussures":
+            start_background_index(chat_id, "64")
+            return start_background_index(chat_id, "3616")
+
         if txt.startswith("/cancel"):
             SEARCH_WAITING.pop(chat_id, None)
             return api("sendMessage", chat_id=chat_id, text="✅ Recherche annulée.")
@@ -964,6 +966,54 @@ def handle(u):
         _, tid, off = d.split(":", 2)
         return send_page(chat_id, tid, int(off))
 
+
+def start_background_index(chat_id, tid):
+    """Indexe une seule fois les anciens messages; les recherches restent instantanées."""
+    tid = str(tid)
+    with INDEXING_LOCK:
+        if tid in INDEXING_TOPICS:
+            return api("sendMessage", chat_id=chat_id, text="⏳ Indexation déjà en cours.")
+        INDEXING_TOPICS.add(tid)
+        CANCEL_SCAN_TOPICS.discard(tid)
+
+    def worker():
+        classified = 0
+        try:
+            ids = list(reversed((CATALOG.get(tid) or {}).get("message_ids", [])))
+            already = _already_classified_ids(tid)
+            for source_message_id in ids:
+                with INDEXING_LOCK:
+                    if tid in CANCEL_SCAN_TOPICS:
+                        api("sendMessage", chat_id=chat_id, text="⛔ Indexation arrêtée.")
+                        return
+                if source_message_id in already:
+                    continue
+                fr = api("forwardMessage", chat_id=chat_id, from_chat_id=SOURCE_CHAT,
+                         message_id=source_message_id, disable_notification=True)
+                if not fr.get("ok"):
+                    continue
+                forwarded = fr.get("result") or {}
+                temp_id = forwarded.get("message_id")
+                try:
+                    kind = message_kind(forwarded)
+                    if kind in ("photo", "video"):
+                        register_brand_message(forwarded, tid, source_message_id, kind)
+                        classified += 1
+                finally:
+                    if temp_id:
+                        api("deleteMessage", chat_id=chat_id, message_id=temp_id)
+            api("sendMessage", chat_id=chat_id,
+                text=f"✅ Indexation terminée : {classified} médias traités. Les recherches sont maintenant instantanées.")
+        finally:
+            with INDEXING_LOCK:
+                INDEXING_TOPICS.discard(tid)
+                CANCEL_SCAN_TOPICS.discard(tid)
+
+    threading.Thread(target=worker, daemon=True).start()
+    return api("sendMessage", chat_id=chat_id,
+        text="⚡ Indexation lancée en arrière-plan. Tu peux continuer à utiliser le bot.",
+        reply_markup={"inline_keyboard":[[{"text":"⛔ Arrêter l’indexation","callback_data":f"cancelscan:{tid}"}]]})
+
 def poll():
     offset=0
     while True:
@@ -985,7 +1035,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: TOUS résultats + lots rapides + CANCEL fonctionnel = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: recherche CACHE instantanée + indexation arrière-plan = ACTIVÉ", flush=True)
     print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)
