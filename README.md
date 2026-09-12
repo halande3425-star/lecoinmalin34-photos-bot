@@ -1,12 +1,13 @@
-# V5.15 — FIX CACHE
+# V5.16 — MARQUES DIRECTES / RAPIDES
 
-Correction de l'erreur Railway :
-`Polling: NameError("name 'text' is not defined")`
+- Homme/Femme simplifié : TN, Nike, Jordan, On Running, ASICS, New Balance, Adidas, Puma, Salomon.
+- Luxe simplifié : Dior, Louis Vuitton, Hermès, Prada, Chanel, Gucci, Balenciaga, Louboutin.
+- `TN` est maintenant une catégorie propre : taper TN affiche seulement les TN indexées.
+- Recherche = cache immédiat, aucun scan Telegram au moment où le client tape une marque.
+- `brand_catalog.json` est déjà pré-indexé à partir de l'export Telegram fourni.
 
-- `/indexchaussures` est maintenant traité dans le contexte du message Telegram.
-- Les recherches clients restent basées sur le cache et ne lancent plus de scan.
-- `/indexchaussures` lance l'indexation Homme/Femme + Luxe une seule fois en arrière-plan.
-- Le bouton d'arrêt reste disponible.
+IMPORTANT : cette version gratuite classe les anciennes publications à partir de leur texte/légende.
+La reconnaissance d'une marque uniquement à partir des pixels d'une photo nécessite un moteur de vision.
 
-Log attendu :
-`AUTO V5.15-FIX-CACHE: cache instantané + /indexchaussures FIXÉ = ACTIVÉ`
+Log Railway :
+`AUTO V5.16-DIRECT-BRANDS: TN direct + menus simplifiés + cache pré-indexé = ACTIVÉ`

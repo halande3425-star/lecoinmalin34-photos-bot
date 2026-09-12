@@ -1,39 +1,25 @@
 {
   "64": {
-    "Nike": [],
-    "New Balance": [],
-    "On Running": [],
-    "Adidas": [],
-    "ASICS": [],
-    "Jordan": [],
-    "Puma": [],
-    "Salomon": [],
-    "UGG": [],
-    "Crocs": [],
-    "Reebok": [],
-    "Converse": [],
-    "Lacoste": [],
-    "Autres / À vérifier": []
+    "TN": [
+      5925
+    ]
   },
   "3616": {
-    "Dior": [],
-    "Louis Vuitton": [],
-    "Prada": [],
-    "Chanel": [],
-    "Hermès": [],
-    "Gucci": [],
-    "Balenciaga": [],
-    "Louboutin": [],
-    "Versace": [],
-    "Valentino": [],
-    "Givenchy": [],
-    "Moncler": [],
-    "Fendi": [],
-    "Bottega Veneta": [],
-    "Alexander McQueen": [],
-    "Dolce & Gabbana": [],
-    "Burberry": [],
-    "Loewe": [],
-    "Autres / À vérifier": []
+    "Chanel": [
+      6005
+    ],
+    "Hermès": [
+      6012
+    ],
+    "Prada": [
+      6017
+    ],
+    "Louis Vuitton": [
+      6024,
+      6039
+    ],
+    "Dior": [
+      6026
+    ]
   }
 }

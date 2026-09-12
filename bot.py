@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.15-FIX-CACHE"
+BUILD_VERSION = "V5.16-DIRECT-BRANDS"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -24,24 +24,18 @@ CANCEL_SCAN_TOPICS = set()
 INDEXING_LOCK = threading.RLock()
 
 REGULAR_BRANDS = [
-    "Nike", "New Balance", "On Running", "Adidas", "ASICS", "Jordan",
-    "Puma", "Salomon", "UGG", "Crocs", "Reebok", "Converse", "Lacoste",
-    "Vans", "Skechers", "Hoka", "Saucony", "Mizuno", "Under Armour",
-    "Veja", "Timberland", "Autres / À vérifier"
+    "TN", "Nike", "Jordan", "On Running", "ASICS", "New Balance",
+    "Adidas", "Puma", "Salomon", "Autres / À vérifier"
 ]
 LUXURY_BRANDS = [
-    "Dior", "Louis Vuitton", "Prada", "Chanel", "Hermès", "Gucci",
-    "Balenciaga", "Louboutin", "Versace", "Valentino", "Givenchy",
-    "Moncler", "Fendi", "Bottega Veneta", "Alexander McQueen",
-    "Dolce & Gabbana", "Burberry", "Loewe", "Amiri", "Miu Miu",
-    "Maison Margiela", "Rick Owens", "Golden Goose", "Off-White",
-    "Autres / À vérifier"
+    "Dior", "Louis Vuitton", "Hermès", "Prada", "Chanel", "Gucci",
+    "Balenciaga", "Louboutin", "Autres / À vérifier"
 ]
 
 
 SEARCH_ALIASES = {
     "64": {
-        "tn": "Nike", "tn3": "Nike", "air max": "Nike", "vapormax": "Nike",
+        "tn": "TN", "tn3": "TN", "air max tn": "TN", "air max": "Nike", "vapormax": "Nike",
         "jordan": "Jordan", "air jordan": "Jordan",
         "samba": "Adidas", "gazelle": "Adidas", "campus": "Adidas",
         "gel nyc": "ASICS", "gel-kayano": "ASICS", "kayano": "ASICS",
@@ -190,7 +184,8 @@ def _canonical_brand_from_text(text, topic_id):
     replacements = [
         (["new balance", "nb "], "New Balance"),
         (["on running", "on cloud", "cloudtilt", "cloudmonster", "cloud 5"], "On Running"),
-        (["nike", "air max", "tn ", "tn3", "vapormax"], "Nike"),
+        ([" tn ", " tn3 ", "air max tn"], "TN"),
+        (["nike", "air max", "vapormax"], "Nike"),
         (["jordan", "air jordan"], "Jordan"),
         (["adidas", "samba", "gazelle", "campus"], "Adidas"),
         (["asics", "gel-kayano", "gel nyc"], "ASICS"),
@@ -1036,7 +1031,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: cache instantané + /indexchaussures FIXÉ = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: TN direct + menus simplifiés + cache pré-indexé = ACTIVÉ", flush=True)
     print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)
