@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.2-FIX"
+BUILD_VERSION = "V5.4-SEARCH-ARTICLES"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -415,7 +415,7 @@ def send_start(chat_id):
     )
 
     rows = [
-        [{"text":"📦  Articles disponibles sur place","callback_data":"cat:2:0"}],
+        [{"text":"📦  Articles disponibles sur place","callback_data":"articlesplace"}],
         [{"text":"👟  Chaussures","callback_data":"group:shoes"}],
         [{"text":"👕  Vêtements","callback_data":"group:clothes"}],
         [{"text":"📱  High-Tech","callback_data":"group:tech"}],
@@ -527,7 +527,14 @@ def group_keyboard(group_id):
     g = next((x for x in MENU["groups"] if x["id"] == group_id), None)
     if not g:
         return {"inline_keyboard":[[{"text":"🏠 Accueil","callback_data":"home"}]]}
+
     rows=[]
+
+    # V5.3 : recherche visible immédiatement dans la rubrique Chaussures.
+    if group_id == "shoes":
+        rows.append([{"text":"🔎 Rechercher Homme / Femme","callback_data":"searchbrand:64"}])
+        rows.append([{"text":"🔎 Rechercher Chaussures de luxe","callback_data":"searchbrand:3616"}])
+
     for tid in g["topics"]:
         c=CATALOG.get(str(tid))
         if not c:
@@ -540,6 +547,7 @@ def group_keyboard(group_id):
             suffix += f" · 📝 {t}"
         callback = f"brandroot:{tid}" if str(tid) in BRAND_TOPIC_IDS else f"cat:{tid}:0"
         rows.append([{"text":f"{clean_title(c['title'])}  |  {suffix}","callback_data":callback}])
+
     rows.append([{"text":"🏠 Accueil","callback_data":"home"}])
     return {"inline_keyboard":rows}
 
@@ -547,7 +555,7 @@ def brand_keyboard(tid):
     tid = str(tid)
     allowed = REGULAR_BRANDS if tid == "64" else LUXURY_BRANDS
     rows = [
-        [{"text": "🔎 Rechercher une marque / un modèle", "callback_data": f"searchbrand:{tid}"}],
+        [{"text": "🔎 RECHERCHER une marque / un modèle", "callback_data": f"searchbrand:{tid}"}],
         [{"text": "👟 Tous les modèles", "callback_data": f"cat:{tid}:0"}],
     ]
     topic_map = BRAND_CATALOG.get(tid, {})
@@ -613,7 +621,7 @@ def send_brand_page(chat_id, tid, brand_index, offset=0):
             text=f"👟 <b>{brand}</b>\n\nAucun article classé dans cette marque pour le moment.",
             parse_mode="HTML",
             reply_markup={"inline_keyboard":[
-                [{"text":"⬅️ Marques","callback_data":f"brandroot:{tid}"}],
+                [{"text":"⬅️ Retour","callback_data":("articlesplace" if tid == "2" else f"brandroot:{tid}")}],
                 [{"text":"🏠 Accueil","callback_data":"home"}]
             ]}
         )
@@ -711,7 +719,7 @@ def handle(u):
                 parse_mode="HTML",
                 reply_markup={"inline_keyboard":[
                     [{"text":"🔎 Réessayer","callback_data":f"searchbrand:{tid}"}],
-                    [{"text":"⬅️ Marques","callback_data":f"brandroot:{tid}"}],
+                    [{"text":"⬅️ Retour","callback_data":("articlesplace" if tid == "2" else f"brandroot:{tid}")}],
                     [{"text":"🏠 Accueil","callback_data":"home"}]
                 ]}
             )
@@ -765,19 +773,34 @@ def handle(u):
                 parse_mode="HTML",
                 reply_markup=group_keyboard(gid)
             )
-    if d.startswith("searchbrand:"):
-        tid = d.split(":", 1)[1]
-        SEARCH_WAITING[chat_id] = tid
-        label = "Homme / Femme" if tid == "64" else "Luxe"
+    if d == "articlesplace":
         return api(
             "sendMessage",
             chat_id=chat_id,
-            text=(
-                f"🔎 <b>Recherche chaussures {label}</b>\n\n"
-                "Écrivez maintenant une <b>marque</b> ou un <b>modèle</b>.\n"
-                "Exemples : Nike, TN, New Balance, On Running, Dior B30, LV Runner.\n\n"
-                "Pour annuler : /cancel"
-            ),
+            text="📦 <b>Articles disponibles sur place</b>\n\nChoisissez :",
+            parse_mode="HTML",
+            reply_markup={"inline_keyboard":[
+                [{"text":"🔎 Rechercher un article","callback_data":"searchbrand:2"}],
+                [{"text":"📦 Voir tous les articles","callback_data":"cat:2:0"}],
+                [{"text":"🏠 Accueil","callback_data":"home"}]
+            ]}
+        )
+    if d.startswith("searchbrand:"):
+        tid = d.split(":", 1)[1]
+        SEARCH_WAITING[chat_id] = tid
+        if tid == "2":
+            title = "🔎 <b>Recherche — Articles disponibles sur place</b>"
+            instruction = "Écrivez le nom de l'<b>article</b>, de la <b>marque</b> ou du <b>modèle</b> recherché."
+            examples = "Exemples : sacoche, parfum, Nike, montre, casque."
+        else:
+            label = "Homme / Femme" if tid == "64" else "Luxe"
+            title = f"🔎 <b>Recherche chaussures {label}</b>"
+            instruction = "Écrivez maintenant une <b>marque</b> ou un <b>modèle</b>."
+            examples = "Exemples : Nike, TN, New Balance, On Running, Dior B30, LV Runner."
+        return api(
+            "sendMessage",
+            chat_id=chat_id,
+            text=f"{title}\n\n{instruction}\n{examples}\n\nPour annuler : /cancel",
             parse_mode="HTML"
         )
     if d.startswith("brandroot:"):
@@ -811,7 +834,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: marques Homme/Femme + Luxe + recherche + Articles sur place = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: RECHERCHE VISIBLE Homme/Femme + Luxe + Articles sur place = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print(f"VISION MARQUES: {'ACTIVÉ' if OPENAI_API_KEY else 'OPENAI_API_KEY MANQUANTE'} ({VISION_MODEL})", flush=True)
     threading.Thread(target=poll,daemon=True).start()
