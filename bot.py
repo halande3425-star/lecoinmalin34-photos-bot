@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.10-ULTRAFAST"
+BUILD_VERSION = "V5.13-BATCH-CANCEL"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -598,7 +598,7 @@ def _scan_old_topic_for_brand(chat_id, tid, target_brand, brand_index):
     """
     tid = str(tid)
     try:
-        ids = list(reversed((CATALOG.get(tid) or {}).get("message_ids", [])))[:120]
+        ids = list(reversed((CATALOG.get(tid) or {}).get("message_ids", [])))[:250]
         already = _already_classified_ids(tid)
         found_before = len(BRAND_CATALOG.get(tid, {}).get(target_brand, []))
         scanned_media = 0
@@ -618,11 +618,19 @@ def _scan_old_topic_for_brand(chat_id, tid, target_brand, brand_index):
                     return
             if source_message_id in already:
                 # Si on a déjà assez de résultats pour cette marque, inutile d'aller plus loin.
-                if len(BRAND_CATALOG.get(tid, {}).get(target_brand, [])) >= 5:
+                if len(BRAND_CATALOG.get(tid, {}).get(target_brand, [])) >= 999999:
                     break
                 continue
 
             checked += 1
+            if checked % 20 == 0:
+                time.sleep(0.01)
+            with INDEXING_LOCK:
+                if tid in CANCEL_SCAN_TOPICS:
+                    print(f"SCAN ANNULÉ ⛔ topic={tid} marque={target_brand}", flush=True)
+                    api("sendMessage", chat_id=chat_id, text="⛔ Scan annulé.")
+                    return
+
             fr = api(
                 "forwardMessage",
                 chat_id=chat_id,
@@ -630,6 +638,15 @@ def _scan_old_topic_for_brand(chat_id, tid, target_brand, brand_index):
                 message_id=source_message_id,
                 disable_notification=True
             )
+
+            with INDEXING_LOCK:
+                if tid in CANCEL_SCAN_TOPICS:
+                    temp_cancel_id = (fr.get("result") or {}).get("message_id") if fr.get("ok") else None
+                    if temp_cancel_id:
+                        api("deleteMessage", chat_id=chat_id, message_id=temp_cancel_id)
+                    print(f"SCAN ANNULÉ ⛔ topic={tid} marque={target_brand}", flush=True)
+                    api("sendMessage", chat_id=chat_id, text="⛔ Scan annulé.")
+                    return
             if not fr.get("ok"):
                 continue
 
@@ -646,7 +663,7 @@ def _scan_old_topic_for_brand(chat_id, tid, target_brand, brand_index):
                     api("deleteMessage", chat_id=chat_id, message_id=temp_id)
 
             # Dès qu'on a une page complète de la marque demandée, on peut répondre.
-            if len(BRAND_CATALOG.get(tid, {}).get(target_brand, [])) >= 5:
+            if len(BRAND_CATALOG.get(tid, {}).get(target_brand, [])) >= 999999:
                 break
 
             # Petite pause pour éviter de brusquer Telegram.
@@ -714,9 +731,9 @@ def start_old_brand_scan(chat_id, tid, target_brand, brand_index):
         chat_id=chat_id,
         text=(
             f"🔎 <b>{target_brand}</b>\n\n"
-            "Je scanne maintenant les anciens messages et leurs textes/légendes.\n"
+            "🔎 Recherche de tous les modèles de la marque…\n"
             "Les copies temporaires sont supprimées automatiquement. C’est 100 % gratuit.\n\n"
-            "⏳ Je t’envoie les résultats dès que j’en trouve."
+            "Je cherche tous les articles de cette marque par lots rapides."
         ),
         parse_mode="HTML",
         reply_markup={"inline_keyboard":[
@@ -904,7 +921,7 @@ def handle(u):
         with INDEXING_LOCK:
             if tid in INDEXING_TOPICS:
                 CANCEL_SCAN_TOPICS.add(tid)
-                return api("sendMessage", chat_id=chat_id, text="⛔ Annulation du scan demandée…")
+                return api("sendMessage", chat_id=chat_id, text="⛔ Annulation demandée. Le scan va s’arrêter immédiatement.")
         return api("sendMessage", chat_id=chat_id, text="ℹ️ Aucun scan en cours.")
 
     if d == "articlesplace":
@@ -968,7 +985,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: scan ULTRA RAPIDE + annulation = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: TOUS résultats + lots rapides + CANCEL fonctionnel = ACTIVÉ", flush=True)
     print("MODE GRATUIT: textes + légendes + modèles connus = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)

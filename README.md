@@ -1,11 +1,14 @@
-# V5.10 ULTRA RAPIDE
+# V5.13 — TOUS LES RÉSULTATS + RAPIDE + CANCEL
 
-- scan des 120 publications les plus récentes en priorité ;
-- affiche dès 5 résultats trouvés ;
-- aucune pause artificielle ;
-- bouton `⛔ Annuler le scan` ;
-- `/cancel` demande aussi l'arrêt du scan ;
-- toujours 100 % gratuit, sans OpenAI.
+Objectif :
+- `Dior` → tous les Dior trouvés dans la tranche scannée ;
+- même fonctionnement pour Nike, ASICS, Hermès, Louis Vuitton, etc. ;
+- scan par passage limité à 250 messages récents pour éviter les attentes interminables ;
+- aucune pause longue ;
+- vérification de l'annulation avant et après chaque récupération Telegram ;
+- bouton `⛔ Annuler le scan` conservé et rendu plus réactif.
 
-Log Railway :
-`AUTO V5.10-ULTRAFAST: scan ULTRA RAPIDE + annulation = ACTIVÉ`
+Version gratuite : classement à partir du texte, de la légende et des modèles/alias connus.
+
+Log Railway attendu :
+`AUTO V5.13-BATCH-CANCEL: TOUS résultats + lots rapides + CANCEL fonctionnel = ACTIVÉ`
