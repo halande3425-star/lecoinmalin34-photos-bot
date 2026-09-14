@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.18-LOCAL-VISION"
+BUILD_VERSION = "V5.19-AUTO-TOPICS"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -132,14 +132,56 @@ def save_brands():
         tmp.replace(RUNTIME_BRANDS)
 
 def _load_catalog():
-    source = RUNTIME_CATALOG if RUNTIME_CATALOG.exists() else BASE_CATALOG
-    with open(source, encoding="utf-8") as f:
-        return json.load(f)
+    # V5.19 : le runtime reste prioritaire, mais les nouveaux topics livrés
+    # dans catalog.json sont fusionnés automatiquement au démarrage.
+    with open(BASE_CATALOG, encoding="utf-8") as f:
+        base = json.load(f)
+
+    if not RUNTIME_CATALOG.exists():
+        return base
+
+    try:
+        with open(RUNTIME_CATALOG, encoding="utf-8") as f:
+            runtime = json.load(f)
+    except Exception:
+        runtime = {}
+
+    for tid, seed in base.items():
+        if tid not in runtime:
+            runtime[tid] = seed
+        else:
+            # Garde les médias/counts runtime mais prend le vrai titre du seed
+            # quand le runtime n'avait qu'un placeholder.
+            title = str(runtime[tid].get("title") or "")
+            if title.startswith("Nouveau catalogue "):
+                runtime[tid]["title"] = seed.get("title", title)
+
+    return runtime
 
 CATALOG = _load_catalog()
 
 with open("menu.json", encoding="utf-8") as f:
     MENU = json.load(f)
+
+def configured_topic_ids():
+    ids = set()
+    for g in MENU.get("groups", []):
+        for tid in g.get("topics", []):
+            ids.add(str(tid))
+    return ids
+
+def topics_for_group(group):
+    """
+    V5.19 : les topics connus gardent leur groupe.
+    Tout nouveau topic Telegram détecté est automatiquement visible dans 'Voir plus'.
+    """
+    topics = [str(x) for x in group.get("topics", [])]
+    if group.get("id") == "more":
+        known = configured_topic_ids()
+        extras = [str(tid) for tid in CATALOG.keys() if str(tid) not in known]
+        extras.sort(key=lambda x: int(x) if x.isdigit() else 10**12)
+        topics.extend(extras)
+    return topics
 
 def save_catalog():
     """Persist the live catalogue safely. Use a Railway Volume mounted at /data."""
@@ -473,18 +515,39 @@ def register_new_content(m):
     return True
 
 def register_topic_title(m):
-    created = m.get("forum_topic_created")
-    if not created:
-        return
+    # Nouveau topic ou renommage de topic.
+    created = m.get("forum_topic_created") or {}
+    edited = m.get("forum_topic_edited") or {}
+    if not created and not edited:
+        return False
+
     thread_id = m.get("message_thread_id") or m.get("message_id")
     if not isinstance(thread_id, int):
-        return
+        return False
+
     key = str(thread_id)
-    title = (created.get("name") or f"Catalogue {thread_id}").strip()
+    title = (
+        created.get("name")
+        or edited.get("name")
+        or (CATALOG.get(key) or {}).get("title")
+        or f"Catalogue {thread_id}"
+    ).strip()
+
     with CATALOG_LOCK:
-        if key in CATALOG:
+        if key not in CATALOG:
+            CATALOG[key] = {
+                "title": title,
+                "message_ids": [],
+                "photos": 0,
+                "videos": 0,
+                "texts": 0,
+            }
+        else:
             CATALOG[key]["title"] = title
-            save_catalog()
+        save_catalog()
+
+    print(f"TOPIC AUTO ✅ id={thread_id} titre={title}", flush=True)
+    return True
 
 app = Flask(__name__, static_folder="web", static_url_path="")
 
@@ -584,7 +647,8 @@ def clean_title(t):
         "Valise 🧳":"Valises",
         "Pc gamer 💻":"PC Gamer",
         "Canapé 🛋️ bubble sur commande":"Canapé Bubble",
-        "Bonnet d’hiver homme femme ☃️":"Bonnet hiver"
+        "Bonnet d’hiver homme femme ☃️":"Bonnet hiver",
+        "Chaise 🪑 gaming 🤩🤩":"Chaise 🪑 Gaming"
     }
     return mapping.get(t, t)
 
@@ -597,7 +661,7 @@ def catalog_api():
     groups = []
     for g in MENU["groups"]:
         items = []
-        for tid in g["topics"]:
+        for tid in topics_for_group(g):
             c = CATALOG.get(str(tid))
             if not c:
                 continue
@@ -628,7 +692,7 @@ def group_keyboard(group_id):
         rows.append([{"text":"🔎 Rechercher Homme / Femme","callback_data":"searchbrand:64"}])
         rows.append([{"text":"🔎 Rechercher Chaussures de luxe","callback_data":"searchbrand:3616"}])
 
-    for tid in g["topics"]:
+    for tid in topics_for_group(g):
         c=CATALOG.get(str(tid))
         if not c:
             continue
@@ -1011,6 +1075,17 @@ def handle(u):
 
         if txt.startswith("/cancel"):
             SEARCH_WAITING.pop(chat_id, None)
+            stopped = []
+            with INDEXING_LOCK:
+                for tid in list(INDEXING_TOPICS):
+                    CANCEL_SCAN_TOPICS.add(tid)
+                    stopped.append(tid)
+            if stopped:
+                return api(
+                    "sendMessage",
+                    chat_id=chat_id,
+                    text="⛔ Recherche + indexation en cours : arrêt demandé."
+                )
             return api("sendMessage", chat_id=chat_id, text="✅ Recherche annulée.")
 
         if txt.startswith(("/start", "/menu")):
@@ -1221,7 +1296,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: vision locale images + reclassement Homme/Femme/Luxe = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: nouveaux topics + nouveaux médias en direct = ACTIVÉ", flush=True)
     print("MODE GRATUIT: VISION LOCALE CLIP + CACHE = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)
