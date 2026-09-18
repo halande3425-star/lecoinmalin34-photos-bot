@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.19-AUTO-TOPICS"
+BUILD_VERSION = "V5.20-ACCUEIL-SANS-RECHERCHE"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -564,10 +564,13 @@ def api(method, **data):
 
 def send_start(chat_id):
     caption = (
-        "✨ <b>LE COIN MALIN 34</b>\n"
-        "<i>Catalogue officiel</i>\n\n"
-        "Bienvenue dans notre catalogue.\n"
-        "Choisissez une catégorie pour découvrir nos produits, photos et vidéos. 👇"
+        "✨ <b>Bienvenue sur LE COIN MALIN 34</b> 🖤💛\n\n"
+        "🛍️ Retrouvez directement notre catalogue et tous nos produits disponibles.\n"
+        "📸 Photos · 🎬 Vidéos · 📦 Nouveautés\n\n"
+        "👇 <b>Choisissez simplement une catégorie ci-dessous</b> pour découvrir nos articles.\n\n"
+        "🛒 Pour commander, ouvrez <b>Comment passer commande</b>.\n"
+        "💬 Vous pouvez aussi consulter les <b>Avis clients</b>.\n\n"
+        "✨ <i>Le catalogue se met à jour avec nos nouveaux produits.</i>"
     )
 
     rows = [
@@ -687,11 +690,6 @@ def group_keyboard(group_id):
 
     rows=[]
 
-    # V5.3 : recherche visible immédiatement dans la rubrique Chaussures.
-    if group_id == "shoes":
-        rows.append([{"text":"🔎 Rechercher Homme / Femme","callback_data":"searchbrand:64"}])
-        rows.append([{"text":"🔎 Rechercher Chaussures de luxe","callback_data":"searchbrand:3616"}])
-
     for tid in topics_for_group(g):
         c=CATALOG.get(str(tid))
         if not c:
@@ -702,7 +700,7 @@ def group_keyboard(group_id):
             suffix += f" · 🎬 {v}"
         if t:
             suffix += f" · 📝 {t}"
-        callback = f"brandroot:{tid}" if str(tid) in BRAND_TOPIC_IDS else f"cat:{tid}:0"
+        callback = f"cat:{tid}:0"
         rows.append([{"text":f"{clean_title(c['title'])}  |  {suffix}","callback_data":callback}])
 
     rows.append([{"text":"🏠 Accueil","callback_data":"home"}])
@@ -1296,7 +1294,7 @@ def main():
         raise SystemExit("BOT_TOKEN manquant")
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
-    print(f"AUTO {BUILD_VERSION}: nouveaux topics + nouveaux médias en direct = ACTIVÉ", flush=True)
+    print(f"AUTO {BUILD_VERSION}: accueil amélioré + recherche chaussures supprimée + topics auto = ACTIVÉ", flush=True)
     print("MODE GRATUIT: VISION LOCALE CLIP + CACHE = ACTIVÉ", flush=True)
     print("TOPIC 2: Articles disponibles sur place = ACTIVÉ", flush=True)
     print("OPENAI API: NON UTILISÉE", flush=True)
