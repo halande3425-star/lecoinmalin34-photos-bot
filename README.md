@@ -1,14 +1,21 @@
-# LE COIN MALIN 34 — V6.0 FINAL PRO
+# LE COIN MALIN 34 — V6.1 FINAL PRO
 
-Version finale orientée client :
-- 🆕 bouton Nouveautés : affiche automatiquement les dernières publications du catalogue ;
-- ✨ accueil premium avec statistiques du catalogue ;
-- 🔄 nouveaux textes, photos et vidéos ajoutés automatiquement ;
-- 🆕 nouveaux topics Telegram détectés automatiquement et ajoutés dans Voir plus ;
-- 🪑 Chaise Gaming conservé ;
-- 👟 recherche chaussures supprimée ;
-- ⚡ dépendances IA lourdes retirées du déploiement : Railway construit beaucoup plus vite ;
-- 📦 Articles sur place, Prêts à expédier, Commande et Avis clients conservés ;
-- 🛍️ Web catalogue Premium conservé lorsqu'une URL Railway/WebApp est configurée.
+Finition client ajoutée à la V6.0 :
 
-Log attendu : `AUTO V6.0-FINAL-PRO`
+- 🛒 Bouton **Commander** après les pages de produits et les Nouveautés.
+- 💬 Bouton **Avis clients** accessible immédiatement.
+- 📣 Bouton vers le groupe **LE COIN MALIN 34** depuis l'accueil.
+- 🆕 Nouveautés automatiques conservées.
+- 📷 Photos, 🎬 vidéos et 📝 textes futurs toujours détectés automatiquement.
+- 🆕 Nouveaux topics toujours détectés automatiquement.
+- 🪑 Chaise Gaming conservée.
+- Recherche chaussures supprimée comme demandé.
+- Version légère : pas de Torch/Transformers.
+
+Par défaut :
+- Commander → topic Telegram 76
+- Avis clients → topic Telegram 5
+- Groupe → https://t.me/Lecoinmalin34
+
+Les liens peuvent plus tard être changés dans Railway avec :
+`ORDER_URL`, `REVIEWS_URL`, `SOURCE_GROUP_URL`.
