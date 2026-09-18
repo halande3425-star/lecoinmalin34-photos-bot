@@ -1,9 +1,14 @@
-# V5.20 — ACCUEIL + CHAUSSURES SANS RECHERCHE
+# LE COIN MALIN 34 — V6.0 FINAL PRO
 
-- Nouveau texte d'accueil LE COIN MALIN 34 au `/start` et `/menu`.
-- Suppression des boutons `🔎 Rechercher Homme / Femme` et `🔎 Rechercher Chaussures de luxe`.
-- Un clic sur `Homme / Femme` ou `Luxe` ouvre directement les articles, sans écran de recherche intermédiaire.
-- Conserve V5.19 : Chaise Gaming 6142, nouveaux textes/photos/vidéos automatiques, nouveaux topics dans `Voir plus`, `/cancel` corrigé.
+Version finale orientée client :
+- 🆕 bouton Nouveautés : affiche automatiquement les dernières publications du catalogue ;
+- ✨ accueil premium avec statistiques du catalogue ;
+- 🔄 nouveaux textes, photos et vidéos ajoutés automatiquement ;
+- 🆕 nouveaux topics Telegram détectés automatiquement et ajoutés dans Voir plus ;
+- 🪑 Chaise Gaming conservé ;
+- 👟 recherche chaussures supprimée ;
+- ⚡ dépendances IA lourdes retirées du déploiement : Railway construit beaucoup plus vite ;
+- 📦 Articles sur place, Prêts à expédier, Commande et Avis clients conservés ;
+- 🛍️ Web catalogue Premium conservé lorsqu'une URL Railway/WebApp est configurée.
 
-Log Railway attendu :
-`AUTO V5.20-ACCUEIL-SANS-RECHERCHE: accueil amélioré + recherche chaussures supprimée + topics auto = ACTIVÉ`
+Log attendu : `AUTO V6.0-FINAL-PRO`

@@ -11,7 +11,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V5.20-ACCUEIL-SANS-RECHERCHE"
+BUILD_VERSION = "V6.0-FINAL-PRO"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -508,9 +508,9 @@ def register_new_content(m):
         flush=True
     )
 
-    # V4 : les photos/vidéos des deux catalogues chaussures sont classées par marque.
-    if key in BRAND_TOPIC_IDS and kind in ("photo", "video"):
-        register_brand_message(m, key, message_id, kind)
+    # V6 FINAL : le catalogue enregistre immédiatement le média.
+    # L’ancienne analyse IA chaussures est désactivée : plus de recherche marque,
+    # démarrage/déploiement beaucoup plus léger.
 
     return True
 
@@ -562,18 +562,27 @@ def api(method, **data):
         print("Telegram error:", method, j, flush=True)
     return j
 
-def send_start(chat_id):
-    caption = (
-        "✨ <b>Bienvenue sur LE COIN MALIN 34</b> 🖤💛\n\n"
-        "🛍️ Retrouvez directement notre catalogue et tous nos produits disponibles.\n"
-        "📸 Photos · 🎬 Vidéos · 📦 Nouveautés\n\n"
-        "👇 <b>Choisissez simplement une catégorie ci-dessous</b> pour découvrir nos articles.\n\n"
-        "🛒 Pour commander, ouvrez <b>Comment passer commande</b>.\n"
-        "💬 Vous pouvez aussi consulter les <b>Avis clients</b>.\n\n"
-        "✨ <i>Le catalogue se met à jour avec nos nouveaux produits.</i>"
-    )
+def catalog_totals():
+    topics = len(CATALOG)
+    items = sum(len(c.get("message_ids", [])) for c in CATALOG.values())
+    photos = sum(int(c.get("photos", 0)) for c in CATALOG.values())
+    videos = sum(int(c.get("videos", 0)) for c in CATALOG.values())
+    return topics, items, photos, videos
 
+def send_start(chat_id):
+    topics, items, photos, videos = catalog_totals()
+    caption = (
+        "✨ <b>LE COIN MALIN 34 — CATALOGUE OFFICIEL</b> 🖤💛\n\n"
+        "Bienvenue 👋 Découvrez nos produits, photos et vidéos directement depuis le catalogue.\n\n"
+        "🆕 <b>Nouveautés</b> : les derniers articles ajoutés\n"
+        "📦 <b>Sur place</b> : les produits disponibles immédiatement\n"
+        "🚚 <b>Prêts à expédier</b> : accès rapide aux produits concernés\n\n"
+        f"📊 <b>{topics} rubriques · {items} publications</b>\n"
+        "🔄 <i>Catalogue mis à jour automatiquement.</i>\n\n"
+        "👇 <b>Choisissez une rubrique :</b>"
+    )
     rows = [
+        [{"text":"🆕  Nouveautés","callback_data":"new:0"}],
         [{"text":"📦  Articles disponibles sur place","callback_data":"articlesplace"}],
         [{"text":"👟  Chaussures","callback_data":"group:shoes"}],
         [{"text":"👕  Vêtements","callback_data":"group:clothes"}],
@@ -586,27 +595,53 @@ def send_start(chat_id):
         [{"text":"✨  Voir plus","callback_data":"group:more"}],
     ]
     if WEBAPP_URL:
-        rows.insert(0, [{"text":"🛍️  Ouvrir le catalogue Premium","web_app":{"url":WEBAPP_URL}}])
+        rows.insert(1, [{"text":"🛍️  Catalogue Premium","web_app":{"url":WEBAPP_URL}}])
     kb = {"inline_keyboard": rows}
-
     try:
         logo_path = "web/logo.png" if os.path.exists("web/logo.png") else "logo.png"
         with open(logo_path, "rb") as f:
-            files = {"photo": ("logo.png", f, "image/png")}
-            data = {
-                "chat_id": str(chat_id),
-                "caption": caption,
-                "parse_mode": "HTML",
+            rr = requests.post(f"{API}/sendPhoto", data={
+                "chat_id": str(chat_id), "caption": caption, "parse_mode": "HTML",
                 "reply_markup": json.dumps(kb, ensure_ascii=False)
-            }
-            rr = requests.post(f"{API}/sendPhoto", data=data, files=files, timeout=90).json()
+            }, files={"photo": ("logo.png", f, "image/png")}, timeout=90).json()
             if rr.get("ok"):
                 return rr
-            print("sendPhoto failed:", rr, flush=True)
     except Exception as e:
         print("sendPhoto local error:", repr(e), flush=True)
-
     return api("sendMessage", chat_id=chat_id, text=caption, parse_mode="HTML", reply_markup=kb)
+
+def latest_message_ids():
+    # Un message peut éventuellement exister dans plusieurs vues : on le déduplique.
+    ids = set()
+    for c in CATALOG.values():
+        for mid in c.get("message_ids", []):
+            if isinstance(mid, int):
+                ids.add(mid)
+    return sorted(ids, reverse=True)
+
+def send_new_page(chat_id, offset=0):
+    ids = latest_message_ids()
+    page = ids[offset:offset + PAGE_SIZE]
+    if not page:
+        return api("sendMessage", chat_id=chat_id, text="ℹ️ Aucune nouveauté pour le moment.",
+                   reply_markup={"inline_keyboard":[[{"text":"🏠 Accueil","callback_data":"home"}]]})
+    # copyMessages respecte l’ordre fourni ; nouveautés = plus récent d’abord.
+    api("sendMessage", chat_id=chat_id,
+        text=f"🆕 <b>NOUVEAUTÉS</b>\nLes {len(page)} dernières publications du catalogue 👇",
+        parse_mode="HTML")
+    res = api("copyMessages", chat_id=chat_id, from_chat_id=SOURCE_CHAT, message_ids=page)
+    if not res.get("ok"):
+        # Certains clients Telegram/API préfèrent un ordre croissant : repli robuste.
+        res = api("copyMessages", chat_id=chat_id, from_chat_id=SOURCE_CHAT, message_ids=sorted(page))
+    nav=[]
+    if offset > 0:
+        nav.append({"text":"⬅️ Plus récentes","callback_data":f"new:{max(0,offset-PAGE_SIZE)}"})
+    if offset + PAGE_SIZE < len(ids):
+        nav.append({"text":"Plus anciennes ➡️","callback_data":f"new:{offset+PAGE_SIZE}"})
+    rows=[nav] if nav else []
+    rows.append([{"text":"🏠 Accueil","callback_data":"home"}])
+    return api("sendMessage", chat_id=chat_id, text="✨ <b>Catalogue actualisé automatiquement</b>",
+               parse_mode="HTML", reply_markup={"inline_keyboard":rows})
 
 def clean_title(t):
     mapping = {
@@ -682,6 +717,13 @@ def catalog_api():
                 "subtitle":g["subtitle"], "items":items
             })
     return jsonify({"groups":groups})
+
+def group_for_topic(tid):
+    tid = str(tid)
+    for g in MENU.get("groups", []):
+        if tid in [str(x) for x in topics_for_group(g)]:
+            return g.get("id")
+    return None
 
 def group_keyboard(group_id):
     g = next((x for x in MENU["groups"] if x["id"] == group_id), None)
@@ -1097,7 +1139,7 @@ def handle(u):
                 text=(
                     "✅ <b>Détection automatique active</b>\n"
                     "📝 Textes + 📷 Photos + 🎬 Vidéos\n"
-                    "🧠 Classement marques : VISION LOCALE GRATUITE + cache\n"
+                    "⚡ Mode catalogue : RAPIDE + AUTOMATIQUE\n"
                     f"📡 Source : <code>{SOURCE_CHAT}</code>\n"
                     f"💾 Sauvegarde persistante : {'oui' if runtime else 'à initialiser au 1er ajout'}"
                 ),
@@ -1120,6 +1162,11 @@ def handle(u):
     d = q.get("data", "")
     if d == "home":
         return send_start(chat_id)
+    if d.startswith("new:"):
+        try:
+            return send_new_page(chat_id, int(d.split(":", 1)[1]))
+        except Exception:
+            return send_new_page(chat_id, 0)
     if d.startswith("group:"):
         gid = d.split(":", 1)[1]
         g = next((x for x in MENU["groups"] if x["id"] == gid), None)
