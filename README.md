@@ -15,7 +15,7 @@ Finition client ajoutée à la V6.0 :
 Par défaut :
 - Commander → topic Telegram 76
 - Avis clients → topic Telegram 5
-- Groupe → https://t.me/Lecoinmalin34
+- Groupe → https://t.me/Lecoinmalin34a
 
 Les liens peuvent plus tard être changés dans Railway avec :
 `ORDER_URL`, `REVIEWS_URL`, `SOURCE_GROUP_URL`.

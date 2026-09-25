@@ -2,12 +2,12 @@ import json, os, time, threading, requests, io, gc
 from flask import Flask, send_from_directory, jsonify
 
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-SOURCE_CHAT = os.environ.get("SOURCE_CHAT", "@Lecoinmalin34").strip()
+SOURCE_CHAT = os.environ.get("SOURCE_CHAT", "@Lecoinmalin34a").strip()
 PUBLIC_DOMAIN = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").strip()
-ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34/76").strip()
-REVIEWS_URL = os.environ.get("REVIEWS_URL", "https://t.me/Lecoinmalin34/5").strip()
-SOURCE_GROUP_URL = os.environ.get("SOURCE_GROUP_URL", "https://t.me/Lecoinmalin34").strip()
+ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34a/76").strip()
+REVIEWS_URL = os.environ.get("REVIEWS_URL", "https://t.me/Lecoinmalin34a/5").strip()
+SOURCE_GROUP_URL = os.environ.get("SOURCE_GROUP_URL", "https://t.me/Lecoinmalin34a").strip()
 if not WEBAPP_URL and PUBLIC_DOMAIN:
     WEBAPP_URL = "https://" + PUBLIC_DOMAIN
 
