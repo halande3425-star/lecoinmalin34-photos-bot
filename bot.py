@@ -2,7 +2,23 @@ import json, os, time, threading, requests, io, gc
 from flask import Flask, send_from_directory, jsonify
 
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-SOURCE_CHAT = os.environ.get("SOURCE_CHAT", os.environ.get("TELEGRAM_SOURCE_CHAT", "@Lecoinmalin34a")).strip()
+
+# Le result.json fourni pour le groupe historique identifie le supergroupe
+# comme "Lecoinmalin34w" avec l'id d'export 3782657059. Dans la Bot API,
+# ce type de groupe est représenté par un id de la forme -100... .
+# On garde le lien public Lecoinmalin34a pour les URLs, mais on utilise
+# l'identifiant numérique pour écouter les nouveaux messages de façon fiable.
+SOURCE_EXPORT_ID = 3782657059
+SOURCE_BOT_API_ID = -1003782657059
+_SOURCE_CONFIG = os.environ.get("SOURCE_CHAT", os.environ.get("TELEGRAM_SOURCE_CHAT", "")).strip()
+if _SOURCE_CONFIG.lower() in {"", "@lecoinmalin34a", "lecoinmalin34a", "https://t.me/lecoinmalin34a"}:
+    SOURCE_CHAT = str(SOURCE_BOT_API_ID)
+else:
+    SOURCE_CHAT = _SOURCE_CONFIG
+SOURCE_CHAT_IDS = {SOURCE_EXPORT_ID, SOURCE_BOT_API_ID}
+SOURCE_CHAT_USERNAMES = {"lecoinmalin34a", "lecoinmalin34w"}
+SOURCE_CHAT_TITLES = {"Lecoinmalin34w", "Lecoinmalin34a"}
+
 PUBLIC_DOMAIN = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").strip()
 ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34a/76").strip()
@@ -14,7 +30,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "APP-V1-AUTO-TOPICS"
+BUILD_VERSION = "APP-V1-AUTO-TOPICS-SOURCE-FIX-BACKFILL"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -186,6 +202,151 @@ def topics_for_group(group):
         topics.extend(extras)
     return topics
 
+def _export_message_kind(m):
+    """Détermine le type d'un message issu de result.json / export Telegram."""
+    if m.get("photo"):
+        return "photo"
+    media_type = str(m.get("media_type") or "").lower()
+    if m.get("video") or media_type.startswith("video"):
+        return "video"
+    if m.get("file"):
+        # Dans l'export Telegram, les vidéos sont souvent présentes dans "file".
+        name = str(m.get("file_name") or m.get("file") or "").lower()
+        if media_type.startswith("video") or name.endswith((".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm")):
+            return "video"
+        mime = str(m.get("mime_type") or "").lower()
+        if mime.startswith("image/"):
+            return "photo"
+        if mime.startswith("video/"):
+            return "video"
+    text = m.get("text")
+    if text:
+        return "text"
+    return None
+
+
+def _telegram_export_root_map(export_messages):
+    """Retourne message_id -> topic_root_id à partir des reply_to_message_id de l'export."""
+    by_id = {m.get("id"): m for m in export_messages if isinstance(m.get("id"), int)}
+    topic_roots = {
+        m.get("id"): m.get("title")
+        for m in export_messages
+        if isinstance(m.get("id"), int) and m.get("action") == "topic_created"
+    }
+    cache = {}
+
+    def find_root(mid, stack=None):
+        if not isinstance(mid, int):
+            return None
+        if mid in topic_roots:
+            return mid
+        if mid in cache:
+            return cache[mid]
+        if stack is None:
+            stack = set()
+        if mid in stack:
+            cache[mid] = None
+            return None
+        stack.add(mid)
+        m = by_id.get(mid) or {}
+        rid = m.get("reply_to_message_id")
+        result = find_root(rid, stack) if isinstance(rid, int) else None
+        stack.discard(mid)
+        cache[mid] = result
+        return result
+
+    return find_root, topic_roots
+
+
+def backfill_catalog_from_export():
+    """Récupère les anciennes publications présentes dans result(2).json.
+
+    Cela complète CATALOG avec les messages Telegram déjà existants mais absents
+    du catalogue courant. Les IDs restent les IDs Telegram d'origine, donc la
+    rubrique « Nouveautés » les voit automatiquement sans créer de doublons.
+    """
+    configured_export = os.environ.get("TELEGRAM_EXPORT_JSON", "").strip()
+    candidates = ([Path(configured_export)] if configured_export else []) + [
+        Path("result.json"),
+        Path("result(2).json"),
+    ]
+    export_path = next((p for p in candidates if p.exists()), None)
+    if export_path is None:
+        print("BACKFILL: aucun export Telegram local trouvé", flush=True)
+        return {"added": 0, "topics": 0, "unmapped_media": 0, "file": None}
+
+    try:
+        with open(export_path, encoding="utf-8") as f:
+            payload = json.load(f)
+        messages = payload.get("messages") or []
+    except Exception as e:
+        print(f"BACKFILL ERROR: impossible de lire {export_path}: {e!r}", flush=True)
+        return {"added": 0, "topics": 0, "unmapped_media": 0, "file": str(export_path)}
+
+    find_root, topic_roots = _telegram_export_root_map(messages)
+    added = 0
+    touched_topics = set()
+    unmapped_media = 0
+
+    with CATALOG_LOCK:
+        for m in messages:
+            if m.get("type") != "message":
+                continue
+            message_id = m.get("id")
+            kind = _export_message_kind(m)
+            if not isinstance(message_id, int) or not kind:
+                continue
+
+            topic_id = find_root(message_id)
+            if not isinstance(topic_id, int):
+                if kind in ("photo", "video"):
+                    unmapped_media += 1
+                continue
+
+            key = str(topic_id)
+            title = (topic_roots.get(topic_id) or "").strip() or f"Catalogue {topic_id}"
+            c = CATALOG.setdefault(key, {
+                "title": title,
+                "message_ids": [],
+                "photos": 0,
+                "videos": 0,
+                "texts": 0,
+            })
+            if not c.get("title") or str(c.get("title")).startswith("Nouveau catalogue "):
+                c["title"] = title
+
+            ids = c.setdefault("message_ids", [])
+            if message_id in ids:
+                continue
+
+            ids.append(message_id)
+            if kind == "photo":
+                c["photos"] = int(c.get("photos", 0)) + 1
+            elif kind == "video":
+                c["videos"] = int(c.get("videos", 0)) + 1
+            else:
+                c["texts"] = int(c.get("texts", 0)) + 1
+            touched_topics.add(key)
+            added += 1
+
+        for key in touched_topics:
+            CATALOG[key]["message_ids"].sort()
+        if added:
+            save_catalog()
+
+    print(
+        f"BACKFILL ✅ fichier={export_path} ajoutés={added} "
+        f"topics={len(touched_topics)} médias_sans_topic={unmapped_media}",
+        flush=True,
+    )
+    return {
+        "added": added,
+        "topics": len(touched_topics),
+        "unmapped_media": unmapped_media,
+        "file": str(export_path),
+    }
+
+
 def save_catalog():
     """Persist the live catalogue safely. Use a Railway Volume mounted at /data."""
     with CATALOG_LOCK:
@@ -197,24 +358,55 @@ def save_catalog():
 
 def resolve_source_chat_id():
     global SOURCE_CHAT_ID
-    try:
-        r = requests.post(f"{API}/getChat", json={"chat_id": SOURCE_CHAT}, timeout=30).json()
+    candidates = []
+    for value in (SOURCE_CHAT, str(SOURCE_BOT_API_ID), "@Lecoinmalin34a", "@Lecoinmalin34w"):
+        if value and value not in candidates:
+            candidates.append(value)
+
+    for candidate in candidates:
+        try:
+            r = requests.post(f"{API}/getChat", json={"chat_id": candidate}, timeout=30).json()
+        except Exception as e:
+            print(f"SOURCE resolve error {candidate}: {e!r}", flush=True)
+            continue
         if r.get("ok"):
             SOURCE_CHAT_ID = r["result"]["id"]
-            print(f"SOURCE OK: {SOURCE_CHAT} -> {SOURCE_CHAT_ID}", flush=True)
-        else:
-            print("SOURCE getChat error:", r, flush=True)
-    except Exception as e:
-        print("SOURCE resolve error:", repr(e), flush=True)
+            chat = r.get("result") or {}
+            print(
+                f"SOURCE OK: {candidate} -> {SOURCE_CHAT_ID} "
+                f"title={chat.get('title')!r} username={chat.get('username')!r}",
+                flush=True,
+            )
+            return True
+        print(f"SOURCE getChat error {candidate}: {r}", flush=True)
+
+    print(
+        "SOURCE ERROR: impossible de résoudre le groupe. "
+        f"IDs attendus={sorted(SOURCE_CHAT_IDS)} usernames={sorted(SOURCE_CHAT_USERNAMES)}",
+        flush=True,
+    )
+    return False
 
 def is_source_message(m):
     chat = m.get("chat") or {}
     cid = chat.get("id")
-    if SOURCE_CHAT_ID is not None:
-        return cid == SOURCE_CHAT_ID
-    username = chat.get("username")
-    if SOURCE_CHAT.startswith("@") and username:
-        return ("@" + username).lower() == SOURCE_CHAT.lower()
+    username = (chat.get("username") or "").lstrip("@").lower()
+    title = (chat.get("title") or "").strip()
+
+    # 1) id Bot API résolu par getChat
+    if isinstance(cid, int):
+        if SOURCE_CHAT_ID is not None and cid == SOURCE_CHAT_ID:
+            return True
+        # 2) id historique de l'export result.json + équivalent Bot API
+        if cid in SOURCE_CHAT_IDS:
+            return True
+
+    # 3) secours par username/titre si Telegram masque l'un des champs
+    if username and username in SOURCE_CHAT_USERNAMES:
+        return True
+    if title and title in SOURCE_CHAT_TITLES:
+        return True
+
     return False
 
 def message_kind(m):
@@ -460,7 +652,14 @@ def register_brand_message(m, topic_id, message_id, kind, force_image=False):
     )
 
 def register_new_content(m):
-    """Ajoute automatiquement les NOUVEAUX textes, photos et vidéos du forum source."""
+    """
+    Ajoute automatiquement chaque nouveau message du forum source.
+
+    Le même message n'est enregistré qu'une seule fois dans son topic.
+    Le menu « Nouveautés » utilise ensuite l'ensemble de ces message_ids,
+    donc une publication reste à la fois dans sa catégorie (ex. 3616 =
+    Chaussures de luxe) et dans Nouveautés.
+    """
     if not is_source_message(m):
         return False
 
@@ -1411,6 +1610,30 @@ def main():
     except Exception as e:
         raise SystemExit(f"Impossible de vérifier BOT_TOKEN auprès de Telegram: {e}")
 
+    # Vérifie que le bot est bien présent dans le groupe source.
+    # Sans accès au groupe, Telegram ne peut pas lui livrer les nouveaux messages.
+    try:
+        if SOURCE_CHAT_ID is not None:
+            cm = requests.post(
+                f"{API}/getChatMember",
+                json={"chat_id": SOURCE_CHAT_ID, "user_id": bot_user.get("id")},
+                timeout=30,
+            ).json()
+            if cm.get("ok"):
+                status = (cm.get("result") or {}).get("status")
+                print(f"SOURCE BOT MEMBERSHIP: status={status}", flush=True)
+                if status in {"member", "restricted"}:
+                    print(
+                        "SOURCE WARNING: le bot est membre simple. "
+                        "Si les nouveaux messages n'arrivent pas, désactive Privacy Mode "
+                        "dans @BotFather ou donne les droits administrateur au bot.",
+                        flush=True,
+                    )
+            else:
+                print(f"SOURCE MEMBER CHECK ERROR: {cm}", flush=True)
+    except Exception as e:
+        print(f"SOURCE MEMBER CHECK ERROR: {e!r}", flush=True)
+
     # Le bot utilise getUpdates (polling). Un ancien webhook empêcherait
     # Telegram de livrer les updates et /start resterait sans réponse.
     try:
@@ -1424,6 +1647,7 @@ def main():
         print(f"TELEGRAM WEBHOOK RESET ERROR: {e!r}", flush=True)
 
     resolve_source_chat_id()
+    backfill_catalog_from_export()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
     print(f"AUTO {BUILD_VERSION}: accueil amélioré + recherche chaussures supprimée + topics auto = ACTIVÉ", flush=True)
     print("MODE GRATUIT: VISION LOCALE CLIP + CACHE = ACTIVÉ", flush=True)
