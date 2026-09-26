@@ -2,7 +2,7 @@ import json, os, time, threading, requests, io, gc
 from flask import Flask, send_from_directory, jsonify
 
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-SOURCE_CHAT = os.environ.get("SOURCE_CHAT", "@Lecoinmalin34a").strip()
+SOURCE_CHAT = os.environ.get("SOURCE_CHAT", os.environ.get("TELEGRAM_SOURCE_CHAT", "@Lecoinmalin34a")).strip()
 PUBLIC_DOMAIN = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").strip()
 ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34a/76").strip()
@@ -1359,7 +1359,25 @@ def poll():
 
 def main():
     if not TOKEN:
-        raise SystemExit("BOT_TOKEN manquant")
+        raise SystemExit("BOT_TOKEN manquant : le bot Telegram ne peut pas démarrer")
+
+    # Diagnostic de démarrage : permet de voir immédiatement dans Railway
+    # quel bot Telegram est réellement lancé et si le token est valide.
+    try:
+        me = requests.get(f"{API}/getMe", timeout=30).json()
+        if not me.get("ok"):
+            raise SystemExit(f"BOT_TOKEN invalide ou refusé par Telegram: {me}")
+        bot_user = me.get("result", {})
+        print(
+            f"TELEGRAM BOT OK: @{bot_user.get('username', '')} "
+            f"id={bot_user.get('id')}",
+            flush=True,
+        )
+    except SystemExit:
+        raise
+    except Exception as e:
+        raise SystemExit(f"Impossible de vérifier BOT_TOKEN auprès de Telegram: {e}")
+
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
     print(f"AUTO {BUILD_VERSION}: accueil amélioré + recherche chaussures supprimée + topics auto = ACTIVÉ", flush=True)

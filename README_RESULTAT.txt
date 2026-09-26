@@ -1,11 +1,11 @@
 LE COIN MALIN 34 - package boutique
 
-Point d’entrée Railway : python shop.py
+Point d’entrée Railway : python bot.py
 Healthcheck : /health
 
 Variables Railway :
 - BOT_TOKEN
-- TELEGRAM_SOURCE_CHAT=@Lecoinmalin34a
+- TELEGRAM_SOURCE_CHAT=@Lecoinmalin34a (ou SOURCE_CHAT)
 - ADMIN_PASSWORD
 - SHOP_SECRET_KEY
 
