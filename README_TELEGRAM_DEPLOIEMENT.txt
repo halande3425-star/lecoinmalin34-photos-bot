@@ -40,3 +40,19 @@ SI LES NOUVEAUX MESSAGES N'ARRIVENT PAS :
   désactiver Group Privacy dans @BotFather ou donner les droits administrateur.
 - Si les logs affichent HTTP=409, une autre instance du même bot utilise encore
   le token : arrêter l'ancien service Railway.
+
+CLASSEMENT AUTOMATIQUE :
+- Le bot analyse le texte et la légende de chaque nouvelle publication.
+- S'il détecte une catégorie plus précise que le topic dans lequel le post a été placé,
+  il rattache automatiquement l'ID du message à cette catégorie dans le catalogue.
+- Les indices prioritaires comprennent notamment : iPhone/AirPods/PC gamer -> High-Tech ;
+  Dyson -> Dyson ; Coques -> Coques téléphone ; Meta -> Lunettes Meta ;
+  Dior B22/B30/LV/prada/etc. + indice chaussure -> Chaussures de luxe ;
+  Nike/Jordan/Adidas/etc. + indice chaussure -> Chaussures homme/femme ;
+  G-Shock / montres / bracelets -> Montres & Bijoux ;
+  casquettes/sacs/lunettes/parfums/valises -> Accessoires ;
+  doudounes/ensembles/maillots/bonnets/vêtements -> les topics vêtements correspondants.
+- Une publication automatiquement reclassée reste affichée dans « Nouveautés » sans doublon,
+  car la vue Nouveautés déduplique les message_ids.
+- Le bot ne déplace pas le message dans Telegram : il corrige son classement dans le catalogue.
+- Lorsqu'il n'y a pas assez d'indices textuels, le topic Telegram d'origine est conservé.

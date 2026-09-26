@@ -30,7 +30,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "APP-V1-AUTO-TOPICS-SOURCE-FIX-BACKFILL"
+BUILD_VERSION = "APP-V1-AUTO-CATEGORIES-NOUVEAUTES-HISTORIQUE"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -225,6 +225,274 @@ def _export_message_kind(m):
     return None
 
 
+
+# -----------------------------------------------------------------------------
+# AUTO-CLASSIFICATION DES PRODUITS
+# -----------------------------------------------------------------------------
+# Le bot ne dépend plus uniquement du topic Telegram dans lequel l'article est
+# posté. Il analyse le texte / la légende / le nom du fichier et peut rattacher
+# automatiquement la publication au bon topic catalogue.
+#
+# Règle importante : le message source n'est pas déplacé dans Telegram. Seul
+# son classement dans le catalogue est corrigé. Comme "Nouveautés" utilise
+# l'ensemble des IDs du catalogue avec déduplication, le même article apparaît
+# à la fois dans sa catégorie et dans "Nouveautés".
+
+AUTO_TOPIC_RULES = [
+    # Services / infos : priorité maximale pour éviter qu'un mot "Nike" dans
+    # une commande client ou un avis ne transforme le message en article.
+    (76, 100, ["comment passer commande", "passer commande", "comment commander", "commander"]),
+    (2854, 100, ["commande client", "commande confirmée", "commande client"]),
+    (5, 100, ["avis client", "avis clients", "témoignage client", "retour client", "satisfaction client"]),
+    (294, 90, ["fournisseur", "fournisseurs", "pack fournisseur", "pack fournisseurs", "exploitation"]),
+    (3327, 90, ["vente en gros", "gros sur commande", "grossiste", "grossistes"]),
+    (2522, 90, ["moto électrique", "moto electrique"]),
+    (5795, 90, ["location de voiture", "location voiture", "-40% voiture"]),
+    (5793, 90, ["basic fit", "basic-fit"]),
+    (5799, 90, ["déblocage snap", "deblocage snap", "snapchat", "déblocage snapchat"]),
+    (5502, 90, ["canapé", "canape", "sofa"]),
+    (6142, 90, ["chaise gaming", "chaise gamer", "chaise de gaming"]),
+
+    # High-Tech / électronique.
+    (168, 95, ["dyson", "aspirateur dyson", "airwrap", "supersonic"]),
+    (1041, 95, ["coque téléphone", "coque iphone", "coque de téléphone", "coque smartphone", "coque samsung"]),
+    (2753, 95, ["lunettes meta", "meta glasses", "ray-ban meta", "ray ban meta"]),
+    (5519, 95, ["pc gamer", "pc gaming", "ordinateur gamer", "tour gamer"]),
+    (223, 85, ["high-tech", "high tech", "électronique", "electronique", "iphone", "ipad", "macbook", "macbook pro", "macbook air", "airpods", "airpod", "samsung", "smartphone", "téléphone", "telephone", "apple watch", "chargeur", "powerbank", "console", "ps5", "xbox", "tablette"]),
+
+    # Accessoires.
+    (805, 95, ["casque arai", "arai", "casque moto"]),
+    (144, 90, ["casquette", "casquette de marque", "cap"]),
+    (314, 90, ["lunettes de soleil", "paire de lunette", "lunettes de marque", "lunette de marque"]),
+    (444, 90, ["parfum", "parfums", "eau de parfum"]),
+    (1086, 90, ["valise", "valises", "bagage", "bagages"]),
+    (56, 120, ["sacoche", "sac à main", "sac a main", "sac de voyage", "sacoche homme", "sacoche femme", "sac ", "sacs "] ),
+
+    # Montres & bijoux.
+    (476, 80, ["montre de marque", "montre rolex", "montre cartier", "montre omega", "montre breitling", "montre"]),
+    (215, 120, ["g-shock", "gshock", "g shock"]),
+    (190, 90, ["bracelet cartier", "jonc cartier", "bracelets cartier", "bracelet", "jonc", "bracelets"]),
+
+    # Chaussures : d'abord les sous-catégories précises.
+    (4147, 100, ["chaussures enfants", "chaussure enfant", "chaussures pour enfants", "basket enfant", "baskets enfant"]),
+    (402, 100, ["chaussure de football", "chaussures de football", "foot", "football", "crampons"]),
+    (663, 100, ["ugg", "ugg femme", "ugg homme"]),
+    (767, 100, ["crocs", "crocs femme", "crocs homme"]),
+    (3616, 98, ["chaussures de luxe", "sneakers luxe", "basket luxe", "paire de luxe", "luxe & chaussures"]),
+    (64, 80, ["chaussure", "chaussures", "sneaker", "sneakers", "basket", "baskets", "nike", "tn", "air max", "jordan", "adidas", "puma", "asics", "new balance", "salomon", "on running", "hoka", "reebok", "converse", "vans", "skechers", "mizuno", "timberland"]),
+
+    # Vêtements, du plus précis au général.
+    (1056, 95, ["alo femme", "alo women"]),
+    (1066, 95, ["alo homme", "alo men"]),
+    (1525, 95, ["vêtement luxe", "vêtements luxe", "vetement luxe", "vetements luxe"]),
+    (5942, 95, ["doudoune", "doudoune hiver", "veste hiver"]),
+    (5993, 95, ["bonnet", "bonnets", "bonnet hiver"]),
+    (527, 95, ["maillot de foot", "maillot football", "maillot de football"]),
+    (934, 95, ["essentials", "ensemble essentials"]),
+    (5977, 90, ["ensemble haut et bas", "ensemble", "survêtement", "survetement"]),
+    (122, 90, ["stone et cp", "stone island", "cp company"]),
+    (1219, 80, ["vêtement", "vêtements", "vetement", "vetements", "t-shirt", "tee-shirt", "pantalon", "jean", "pull", "sweat", "hoodie", "chemise", "short", "robe", "jupe", "veste"]),
+]
+
+
+def _flatten_telegram_text(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(_flatten_telegram_text(x) for x in value)
+    if isinstance(value, dict):
+        return _flatten_telegram_text(value.get("text") or value.get("caption") or "")
+    return ""
+
+
+def _message_search_text(m):
+    parts = [
+        _flatten_telegram_text(m.get("caption")),
+        _flatten_telegram_text(m.get("text")),
+        _flatten_telegram_text(m.get("message")),
+    ]
+    doc = m.get("document") or {}
+    parts.append(str(doc.get("file_name") or ""))
+    parts.append(str(m.get("file_name") or ""))
+    return " ".join(x for x in parts if x).strip().casefold()
+
+
+def _contains_rule_keyword(text, keyword):
+    kw = keyword.casefold().strip()
+    if not kw:
+        return False
+    if kw.endswith(" "):
+        return kw in text
+    return kw in text
+
+
+def classify_product_topic(m, original_topic=None, topic_title=None):
+    """Retourne (topic_id, score, reason).
+
+    Un score élevé indique un classement textuel suffisamment explicite pour
+    corriger un post placé dans le mauvais topic. À défaut de signal fort, on
+    conserve le topic d'origine.
+    """
+    text = _message_search_text(m)
+    original = str(original_topic) if original_topic is not None else ""
+    title = (topic_title or (CATALOG.get(original) or {}).get("title") or "").casefold()
+
+    best_tid = original or None
+    best_score = 0
+    best_reason = "topic Telegram"
+
+    # Indices contextuels très forts : une marque de luxe ne signifie pas
+    # automatiquement "Chaussures de luxe" (elle peut désigner un sac ou un
+    # vêtement). On exige donc un indice chaussure lorsque la marque seule est
+    # ambiguë. Même logique pour une marque de sneakers standard.
+    shoe_cues = [
+        "chaussure", "chaussures", "basket", "baskets", "sneaker", "sneakers",
+        "paire", "air max", "tn", "jordan", "b22", "b30", "lv trainer",
+        "lv runner", "crampons", "football", "crocs", "ugg"
+    ]
+    luxury_brands = [
+        "dior", "louis vuitton", "lv trainer", "lv runner", "prada", "chanel",
+        "gucci", "balenciaga", "louboutin", "hermès", "hermes", "valentino",
+        "givenchy", "moncler", "fendi", "amiri", "off-white", "off white",
+        "alexander mcqueen", "mcqueen"
+    ]
+    regular_shoe_brands = [
+        "nike", "tn", "air max", "jordan", "adidas", "puma", "asics",
+        "new balance", "salomon", "on running", "hoka", "reebok", "converse",
+        "vans", "skechers", "mizuno", "timberland"
+    ]
+    if any(_contains_rule_keyword(text, x) for x in shoe_cues):
+        if any(_contains_rule_keyword(text, x) for x in luxury_brands):
+            best_tid, best_score, best_reason = "3616", 135, "marque luxe + indice chaussure"
+        elif any(_contains_rule_keyword(text, x) for x in regular_shoe_brands):
+            best_tid, best_score, best_reason = "64", 125, "marque chaussure + indice chaussure"
+
+    # Le contenu du message prime sur le topic d'origine.
+    for tid, base, keywords in AUTO_TOPIC_RULES:
+        hits = [kw for kw in keywords if _contains_rule_keyword(text, kw)]
+        if not hits:
+            continue
+        # Plusieurs indices concordants renforcent le classement.
+        score = base + min(20, 5 * (len(hits) - 1))
+        if score > best_score:
+            best_tid = str(tid)
+            best_score = score
+            best_reason = ", ".join(hits[:3])
+
+    # Sans texte exploitable : le titre du topic reste le meilleur signal.
+    if best_score == 0 and title:
+        pseudo = {"text": title}
+        for tid, base, keywords in AUTO_TOPIC_RULES:
+            hits = [kw for kw in keywords if _contains_rule_keyword(title, kw)]
+            if hits and base > best_score:
+                best_tid = str(tid)
+                best_score = max(30, base // 2)
+                best_reason = "topic: " + hits[0]
+
+    return best_tid, best_score, best_reason
+
+
+AUTO_MOVE_THRESHOLD = 85
+AUTO_TOPIC_IDS = {str(tid) for tid, _base, _keywords in AUTO_TOPIC_RULES}
+AUTO_TOPIC_IDS.update(configured_topic_ids() if 'configured_topic_ids' in globals() else set())
+PROTECTED_AUTO_TOPICS = {"2", "5", "76", "2854", "294", "3327", "3476", "5793", "5795", "5799", "5502", "6142"}
+
+
+def _ensure_catalog_bucket(topic_id, title=None):
+    key = str(topic_id)
+    c = CATALOG.get(key)
+    if c is None:
+        seed = {}
+        try:
+            with open(BASE_CATALOG, encoding="utf-8") as f:
+                seed = json.load(f).get(key) or {}
+        except Exception:
+            seed = {}
+        CATALOG[key] = {
+            "title": title or seed.get("title") or f"Catalogue {key}",
+            "message_ids": [],
+            "photos": 0,
+            "videos": 0,
+            "texts": 0,
+        }
+        c = CATALOG[key]
+    elif title and (not c.get("title") or str(c.get("title")).startswith("Nouveau catalogue ")):
+        c["title"] = title
+    return c
+
+
+def _remove_from_topic(topic_id, message_id, kind=None):
+    key = str(topic_id)
+    c = CATALOG.get(key)
+    if not c:
+        return False
+    ids = c.setdefault("message_ids", [])
+    if message_id not in ids:
+        return False
+    ids[:] = [x for x in ids if x != message_id]
+    if kind == "photo":
+        c["photos"] = max(0, int(c.get("photos", 0)) - 1)
+    elif kind == "video":
+        c["videos"] = max(0, int(c.get("videos", 0)) - 1)
+    elif kind == "text":
+        c["texts"] = max(0, int(c.get("texts", 0)) - 1)
+    return True
+
+
+def _add_to_topic(topic_id, message_id, kind, title=None):
+    c = _ensure_catalog_bucket(topic_id, title)
+    ids = c.setdefault("message_ids", [])
+    if message_id in ids:
+        return False
+    ids.append(message_id)
+    ids.sort()
+    if kind == "photo":
+        c["photos"] = int(c.get("photos", 0)) + 1
+    elif kind == "video":
+        c["videos"] = int(c.get("videos", 0)) + 1
+    else:
+        c["texts"] = int(c.get("texts", 0)) + 1
+    return True
+
+
+def auto_place_message(m, original_topic, kind, source_title=None, source_is_export=False):
+    """Classe un message dans le topic catalogue le plus probable."""
+    destination, score, reason = classify_product_topic(
+        m, original_topic=original_topic, topic_title=source_title
+    )
+    source_key = str(original_topic)
+    dest_key = str(destination or source_key)
+
+    # On ne déplace automatiquement que lorsqu'on dispose d'un indice texte
+    # suffisamment fort. Sinon on conserve le topic Telegram d'origine.
+    if dest_key != source_key and score < AUTO_MOVE_THRESHOLD:
+        dest_key = source_key
+        reason = "score insuffisant"
+
+    with CATALOG_LOCK:
+        # Toujours conserver le message au moins dans sa destination.
+        dest_title = (CATALOG.get(dest_key) or {}).get("title")
+        added = _add_to_topic(dest_key, m.get("id") if source_is_export else m.get("message_id"), kind, dest_title)
+
+        # Pour un nouveau post, lorsqu'on a un classement automatique fort,
+        # on retire l'ID de son ancien topic catalogue afin d'éviter le mauvais
+        # classement dans l'interface.
+        mid = m.get("id") if source_is_export else m.get("message_id")
+        moved = False
+        if dest_key != source_key and score >= AUTO_MOVE_THRESHOLD and source_key not in PROTECTED_AUTO_TOPICS:
+            moved = _remove_from_topic(source_key, mid, kind)
+
+        if added or moved:
+            save_catalog()
+
+    print(
+        f"AUTO CATEGORIE ✅ origine={source_key} destination={dest_key} "
+        f"score={score} raison={reason} message={m.get('id') if source_is_export else m.get('message_id')}",
+        flush=True,
+    )
+    return dest_key, score, reason
+
+
 def _telegram_export_root_map(export_messages):
     """Retourne message_id -> topic_root_id à partir des reply_to_message_id de l'export."""
     by_id = {m.get("id"): m for m in export_messages if isinstance(m.get("id"), int)}
@@ -317,6 +585,9 @@ def backfill_catalog_from_export():
 
             ids = c.setdefault("message_ids", [])
             if message_id in ids:
+                # Même si l'article existait déjà, on peut maintenant améliorer
+                # son classement automatiquement grâce à son texte historique.
+                auto_place_message(m, key, kind, source_title=title, source_is_export=True)
                 continue
 
             ids.append(message_id)
@@ -328,6 +599,7 @@ def backfill_catalog_from_export():
                 c["texts"] = int(c.get("texts", 0)) + 1
             touched_topics.add(key)
             added += 1
+            auto_place_message(m, key, kind, source_title=title, source_is_export=True)
 
         for key in touched_topics:
             CATALOG[key]["message_ids"].sort()
@@ -653,12 +925,13 @@ def register_brand_message(m, topic_id, message_id, kind, force_image=False):
 
 def register_new_content(m):
     """
-    Ajoute automatiquement chaque nouveau message du forum source.
+    Enregistre chaque nouvelle publication du forum source et la classe
+    automatiquement dans le bon topic catalogue.
 
-    Le même message n'est enregistré qu'une seule fois dans son topic.
-    Le menu « Nouveautés » utilise ensuite l'ensemble de ces message_ids,
-    donc une publication reste à la fois dans sa catégorie (ex. 3616 =
-    Chaussures de luxe) et dans Nouveautés.
+    Exemple : une paire Dior postée dans un mauvais topic sera rattachée à
+    "Chaussures de luxe" (3616). Le même message sera visible dans
+    "Nouveautés" car cette vue agrège tous les IDs du catalogue avec
+    déduplication.
     """
     if not is_source_message(m):
         return False
@@ -667,10 +940,6 @@ def register_new_content(m):
     if not kind:
         return False
 
-    # Dans un forum Telegram, le message porte normalement message_thread_id.
-    # Certains updates peuvent toutefois transmettre le topic via le message
-    # auquel la publication répond : on utilise ce fallback pour conserver le
-    # classement dans la bonne catégorie.
     thread_id = m.get("message_thread_id")
     if not isinstance(thread_id, int):
         reply = m.get("reply_to_message") or {}
@@ -693,36 +962,26 @@ def register_new_content(m):
                 "videos": 0,
                 "texts": 0,
             }
-
         c = CATALOG[key]
-        ids = c.setdefault("message_ids", [])
-        if message_id in ids:
-            # Une ancienne publication modifiée/reçue de nouveau peut être reclassée par vision.
-            if key in BRAND_TOPIC_IDS and kind in ("photo", "video"):
-                register_brand_message(m, key, message_id, kind)
-            return False
+        already = message_id in c.setdefault("message_ids", [])
+        if not already:
+            _add_to_topic(key, message_id, kind, c.get("title"))
+            save_catalog()
 
-        ids.append(message_id)
-        ids.sort()
-
-        if kind == "photo":
-            c["photos"] = int(c.get("photos", 0)) + 1
-        elif kind == "video":
-            c["videos"] = int(c.get("videos", 0)) + 1
-        else:
-            c["texts"] = int(c.get("texts", 0)) + 1
-
-        save_catalog()
-
-    print(
-        f"AUTO AJOUT ✅ topic={thread_id} message={message_id} type={kind}",
-        flush=True
+    # Même si le message existait déjà, on recalculera son classement si
+    # Telegram le renvoie (édition / retry / redémarrage).
+    auto_place_message(
+        m,
+        key,
+        kind,
+        source_title=(CATALOG.get(key) or {}).get("title"),
+        source_is_export=False,
     )
 
-    # V6 FINAL : le catalogue enregistre immédiatement le média.
-    # L’ancienne analyse IA chaussures est désactivée : plus de recherche marque,
-    # démarrage/déploiement beaucoup plus léger.
-
+    print(
+        f"AUTO AJOUT ✅ origine={thread_id} message={message_id} type={kind}",
+        flush=True,
+    )
     return True
 
 def register_topic_title(m):
