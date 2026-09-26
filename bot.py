@@ -2,19 +2,19 @@ import json, os, time, threading, requests, io, gc
 from flask import Flask, send_from_directory, jsonify
 
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-SOURCE_CHAT = os.environ.get("SOURCE_CHAT", "@Lecoinmalin34").strip()
+SOURCE_CHAT = os.environ.get("SOURCE_CHAT", "@Lecoinmalin34a").strip()
 PUBLIC_DOMAIN = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").strip()
-ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34/76").strip()
-REVIEWS_URL = os.environ.get("REVIEWS_URL", "https://t.me/Lecoinmalin34/5").strip()
-SOURCE_GROUP_URL = os.environ.get("SOURCE_GROUP_URL", "https://t.me/Lecoinmalin34").strip()
+ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34a/76").strip()
+REVIEWS_URL = os.environ.get("REVIEWS_URL", "https://t.me/Lecoinmalin34a/5").strip()
+SOURCE_GROUP_URL = os.environ.get("SOURCE_GROUP_URL", "https://t.me/Lecoinmalin34a").strip()
 if not WEBAPP_URL and PUBLIC_DOMAIN:
     WEBAPP_URL = "https://" + PUBLIC_DOMAIN
 
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "APP-V1-AUTO"
+BUILD_VERSION = "APP-V1-AUTO-TOPICS"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -468,11 +468,20 @@ def register_new_content(m):
     if not kind:
         return False
 
-    # In a Telegram forum, every message posted inside a topic carries message_thread_id.
+    # Dans un forum Telegram, le message porte normalement message_thread_id.
+    # Certains updates peuvent toutefois transmettre le topic via le message
+    # auquel la publication répond : on utilise ce fallback pour conserver le
+    # classement dans la bonne catégorie.
     thread_id = m.get("message_thread_id")
+    if not isinstance(thread_id, int):
+        reply = m.get("reply_to_message") or {}
+        fallback_thread = reply.get("message_thread_id")
+        if isinstance(fallback_thread, int):
+            thread_id = fallback_thread
+
     message_id = m.get("message_id")
-    if not isinstance(thread_id, int) or not isinstance(message_id, int):
-        print(f"AUTO IGNORE: message {message_id}, aucun message_thread_id", flush=True)
+    if not isinstance(thread_id, int) or thread_id <= 0 or not isinstance(message_id, int):
+        print(f"AUTO IGNORE: message {message_id}, topic Telegram introuvable", flush=True)
         return False
 
     key = str(thread_id)

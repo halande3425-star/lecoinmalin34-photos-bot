@@ -5,7 +5,7 @@ Healthcheck : /health
 
 Variables Railway :
 - BOT_TOKEN
-- TELEGRAM_SOURCE_CHAT=@Lecoinmalin34
+- TELEGRAM_SOURCE_CHAT=@Lecoinmalin34a
 - ADMIN_PASSWORD
 - SHOP_SECRET_KEY
 
