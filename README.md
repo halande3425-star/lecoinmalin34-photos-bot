@@ -1,30 +1,27 @@
-# LE COIN MALIN 34 — Catalogue Telegram Bot (fix)
+# LE COIN MALIN 34 — APPLICATION V1 AUTO
 
-Ce bot transforme le forum Telegram source en catalogue dynamique.
+Cette version transforme le même service Railway en **application web mobile installable (PWA)** tout en gardant le bot Telegram.
 
-## Ce qu'il fait
-- importe les topics depuis `result.json` ;
-- conserve les publications associées à leur topic ;
-- affiche les publications dans le bot avec `copyMessage`, donc les vraies photos/vidéos Telegram sont recopiées sans stocker de faux chemins locaux ;
-- détecte automatiquement les nouveaux messages et nouvelles images/vidéos du groupe ;
-- détecte les nouveaux topics du forum ;
-- garde la navigation Accueil → Topic → Publications avec pagination ;
-- fournit `/status` pour contrôler le nombre de topics/publications/médias ;
-- expose `/health` et `/api/topics` pour Railway.
+## Automatique
+Le groupe Telegram reste la source du catalogue. Quand le bot reçoit une nouvelle photo, vidéo ou un nouveau texte dans un topic, il met à jour `catalog_runtime.json`. L'application lit ce même catalogue : aucune double saisie.
 
-## Variables Railway
-- `BOT_TOKEN` : token du bot créé via BotFather (secret)
-- `SOURCE_CHAT_ID` : `-1003782657059` par défaut
-- `SOURCE_CHAT_USERNAME` : `Lecoinmalin34w` par défaut
-- `ADMIN_USER_ID` : facultatif, pour réserver `/status`
-- `DATA_DIR=/data` conseillé sur Railway avec volume persistant
-- `PORT=8080`
+- 🆕 Nouveautés actualisées automatiquement
+- 📷 Compteurs photos
+- 🎬 Compteurs vidéos
+- 📝 Compteurs textes
+- ✨ Nouveaux topics détectés par le bot
+- 🛒 Commande via Telegram
+- 📣 Accès au groupe Telegram
+- 📱 Application installable depuis le navigateur
 
-## Telegram
-Le nouveau bot doit être administrateur dans le groupe/forum source et la confidentialité du bot doit être désactivée dans BotFather (`/setprivacy` → Disable) pour recevoir les nouveaux messages.
+## Important sur les médias
+Cette V1 utilise les publications Telegram comme source : les cartes ouvrent la photo/vidéo/message correspondant dans Telegram. Cela évite de dupliquer et d'héberger des milliers de médias sur Railway.
 
-Le bot n'a pas besoin de télécharger les photos sur le disque : lorsqu'un utilisateur ouvre un topic, le bot utilise l'API Telegram `copyMessage` pour afficher directement le vrai média du message source. Ainsi, les nouvelles photos ajoutées dans Telegram sont prises en compte automatiquement.
+Pour afficher **les photos et vidéos directement dans l'application sans ouvrir Telegram**, il faudra une V2 avec un stockage média public (Cloudinary, S3/R2, etc.) et une migration/synchronisation des anciens médias.
 
-## Déploiement
-Start command : `python bot.py`
-Healthcheck : `/health`
+## Railway
+Après déploiement, il faut exposer le service avec un domaine Railway dans `Settings > Networking / Public Networking`.
+Le serveur écoute déjà sur `PORT`.
+
+Log attendu :
+`AUTO APP-V1-AUTO: application mobile + catalogue Telegram automatique = ACTIVÉ`
