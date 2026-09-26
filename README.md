@@ -1,21 +1,27 @@
-# LE COIN MALIN 34 — V6.1 FINAL PRO
+# LE COIN MALIN 34 — APPLICATION V1 AUTO
 
-Finition client ajoutée à la V6.0 :
+Cette version transforme le même service Railway en **application web mobile installable (PWA)** tout en gardant le bot Telegram.
 
-- 🛒 Bouton **Commander** après les pages de produits et les Nouveautés.
-- 💬 Bouton **Avis clients** accessible immédiatement.
-- 📣 Bouton vers le groupe **LE COIN MALIN 34** depuis l'accueil.
-- 🆕 Nouveautés automatiques conservées.
-- 📷 Photos, 🎬 vidéos et 📝 textes futurs toujours détectés automatiquement.
-- 🆕 Nouveaux topics toujours détectés automatiquement.
-- 🪑 Chaise Gaming conservée.
-- Recherche chaussures supprimée comme demandé.
-- Version légère : pas de Torch/Transformers.
+## Automatique
+Le groupe Telegram reste la source du catalogue. Quand le bot reçoit une nouvelle photo, vidéo ou un nouveau texte dans un topic, il met à jour `catalog_runtime.json`. L'application lit ce même catalogue : aucune double saisie.
 
-Par défaut :
-- Commander → topic Telegram 76
-- Avis clients → topic Telegram 5
-- Groupe → https://t.me/Lecoinmalin34a
+- 🆕 Nouveautés actualisées automatiquement
+- 📷 Compteurs photos
+- 🎬 Compteurs vidéos
+- 📝 Compteurs textes
+- ✨ Nouveaux topics détectés par le bot
+- 🛒 Commande via Telegram
+- 📣 Accès au groupe Telegram
+- 📱 Application installable depuis le navigateur
 
-Les liens peuvent plus tard être changés dans Railway avec :
-`ORDER_URL`, `REVIEWS_URL`, `SOURCE_GROUP_URL`.
+## Important sur les médias
+Cette V1 utilise les publications Telegram comme source : les cartes ouvrent la photo/vidéo/message correspondant dans Telegram. Cela évite de dupliquer et d'héberger des milliers de médias sur Railway.
+
+Pour afficher **les photos et vidéos directement dans l'application sans ouvrir Telegram**, il faudra une V2 avec un stockage média public (Cloudinary, S3/R2, etc.) et une migration/synchronisation des anciens médias.
+
+## Railway
+Après déploiement, il faut exposer le service avec un domaine Railway dans `Settings > Networking / Public Networking`.
+Le serveur écoute déjà sur `PORT`.
+
+Log attendu :
+`AUTO APP-V1-AUTO: application mobile + catalogue Telegram automatique = ACTIVÉ`

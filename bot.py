@@ -2,7 +2,7 @@ import json, os, time, threading, requests, io, gc
 from flask import Flask, send_from_directory, jsonify
 
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-SOURCE_CHAT = os.environ.get("SOURCE_CHAT", os.environ.get("TELEGRAM_SOURCE_CHAT", "@Lecoinmalin34")).strip()
+SOURCE_CHAT = os.environ.get("SOURCE_CHAT", "@Lecoinmalin34").strip()
 PUBLIC_DOMAIN = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").strip()
 ORDER_URL = os.environ.get("ORDER_URL", "https://t.me/Lecoinmalin34/76").strip()
@@ -14,7 +14,7 @@ if not WEBAPP_URL and PUBLIC_DOMAIN:
 API = f"https://api.telegram.org/bot{TOKEN}"
 PAGE_SIZE = 20
 SOURCE_CHAT_ID = None
-BUILD_VERSION = "V6.1-FINAL-PRO"
+BUILD_VERSION = "APP-V1-AUTO"
 
 # --- V5 : marques séparées Homme/Femme + Luxe + recherche de marque/modèle ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -1334,19 +1334,11 @@ def start_background_index(chat_id, tid, force_image=False, silent_start=False):
 
 def poll():
     offset=0
-    allowed_updates = [
-        "message", "edited_message", "channel_post", "edited_channel_post",
-        "callback_query"
-    ]
     while True:
         try:
             r=requests.get(
                 f"{API}/getUpdates",
-                params={
-                    "timeout": 50,
-                    "offset": offset,
-                    "allowed_updates": json.dumps(allowed_updates)
-                },
+                params={"timeout": 50, "offset": offset},
                 timeout=60
             ).json()
             for u in r.get("result",[]):
@@ -1359,14 +1351,7 @@ def poll():
 def main():
     if not TOKEN:
         raise SystemExit("BOT_TOKEN manquant")
-    # Force le mode polling pour que les nouveaux messages du forum soient
-    # reçus même si un ancien webhook a été configuré sur ce bot.
-    try:
-        requests.post(f"{API}/deleteWebhook", json={"drop_pending_updates": False}, timeout=30)
-    except Exception as e:
-        print("deleteWebhook:", repr(e), flush=True)
     resolve_source_chat_id()
-    print(f"SOURCE TELEGRAM: {SOURCE_CHAT}", flush=True)
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
     print(f"AUTO {BUILD_VERSION}: accueil amélioré + recherche chaussures supprimée + topics auto = ACTIVÉ", flush=True)
     print("MODE GRATUIT: VISION LOCALE CLIP + CACHE = ACTIVÉ", flush=True)
