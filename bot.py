@@ -1345,16 +1345,49 @@ def poll():
     offset=0
     while True:
         try:
-            r=requests.get(
+            resp = requests.get(
                 f"{API}/getUpdates",
-                params={"timeout": 50, "offset": offset},
+                params={
+                    "timeout": 50,
+                    "offset": offset,
+                    "allowed_updates": json.dumps([
+                        "message", "edited_message", "callback_query",
+                        "channel_post", "edited_channel_post"
+                    ])
+                },
                 timeout=60
-            ).json()
-            for u in r.get("result",[]):
+            )
+            try:
+                r = resp.json()
+            except Exception:
+                r = {"ok": False, "description": resp.text[:500]}
+
+            if not r.get("ok"):
+                # Telegram renvoie notamment 409 lorsqu'un autre processus
+                # utilise déjà getUpdates avec le même token. Sans ce log,
+                # le bot semble démarré mais ne répond jamais aux messages.
+                print(
+                    f"TELEGRAM getUpdates ERROR HTTP={resp.status_code} "
+                    f"payload={r}",
+                    flush=True
+                )
+                time.sleep(5)
+                continue
+
+            updates = r.get("result", []) or []
+            if updates:
+                print(f"TELEGRAM UPDATES: {len(updates)}", flush=True)
+            for u in updates:
                 offset=u["update_id"]+1
-                handle(u)
+                try:
+                    handle(u)
+                except Exception as e:
+                    print(
+                        f"TELEGRAM UPDATE ERROR id={u.get('update_id')}: {e!r}",
+                        flush=True
+                    )
         except Exception as e:
-            print("Polling:",repr(e),flush=True)
+            print("Polling NETWORK ERROR:",repr(e),flush=True)
             time.sleep(3)
 
 def main():
@@ -1377,6 +1410,18 @@ def main():
         raise
     except Exception as e:
         raise SystemExit(f"Impossible de vérifier BOT_TOKEN auprès de Telegram: {e}")
+
+    # Le bot utilise getUpdates (polling). Un ancien webhook empêcherait
+    # Telegram de livrer les updates et /start resterait sans réponse.
+    try:
+        wh = requests.post(
+            f"{API}/deleteWebhook",
+            json={"drop_pending_updates": False},
+            timeout=30
+        ).json()
+        print(f"TELEGRAM WEBHOOK RESET: {wh}", flush=True)
+    except Exception as e:
+        print(f"TELEGRAM WEBHOOK RESET ERROR: {e!r}", flush=True)
 
     resolve_source_chat_id()
     print(f"Catalogue dynamique: {RUNTIME_CATALOG}", flush=True)
