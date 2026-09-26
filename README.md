@@ -1,27 +1,17 @@
-# LE COIN MALIN 34 — APPLICATION V1 AUTO
+# LE COIN MALIN 34 — Boutique Telegram miroir
 
-Cette version transforme le même service Railway en **application web mobile installable (PWA)** tout en gardant le bot Telegram.
+Source catalogue: `result(2).json` (4042 messages). Les 42 topics sont conservés dans `telegram_catalog.json`.
 
-## Automatique
-Le groupe Telegram reste la source du catalogue. Quand le bot reçoit une nouvelle photo, vidéo ou un nouveau texte dans un topic, il met à jour `catalog_runtime.json`. L'application lit ce même catalogue : aucune double saisie.
+## Railway variables
+- `BOT_TOKEN` : token du nouveau bot BotFather
+- `TELEGRAM_SOURCE_CHAT` : `@Lecoinmalin34`
+- `TELEGRAM_SOURCE_CHAT_ID` : `-1003782657059`
+- `ADMIN_PASSWORD` : secret admin
+- `SHOP_SECRET_KEY` : secret aléatoire
+- `BANK_TRANSFER_INSTRUCTIONS` : instructions de virement privées
+- `SHOP_DB` : optionnel, par défaut `/data/shop.db` si le volume existe
+- `TELEGRAM_MEDIA_DIR` : optionnel, par défaut `/data/telegram_media`
 
-- 🆕 Nouveautés actualisées automatiquement
-- 📷 Compteurs photos
-- 🎬 Compteurs vidéos
-- 📝 Compteurs textes
-- ✨ Nouveaux topics détectés par le bot
-- 🛒 Commande via Telegram
-- 📣 Accès au groupe Telegram
-- 📱 Application installable depuis le navigateur
+Le serveur utilise `copyMessage` vers le chat source, récupère le vrai `file_id`, appelle `getFile`, télécharge le média puis supprime immédiatement le message temporaire. Les médias sont mis en cache dans `/data/telegram_media`.
 
-## Important sur les médias
-Cette V1 utilise les publications Telegram comme source : les cartes ouvrent la photo/vidéo/message correspondant dans Telegram. Cela évite de dupliquer et d'héberger des milliers de médias sur Railway.
-
-Pour afficher **les photos et vidéos directement dans l'application sans ouvrir Telegram**, il faudra une V2 avec un stockage média public (Cloudinary, S3/R2, etc.) et une migration/synchronisation des anciens médias.
-
-## Railway
-Après déploiement, il faut exposer le service avec un domaine Railway dans `Settings > Networking / Public Networking`.
-Le serveur écoute déjà sur `PORT`.
-
-Log attendu :
-`AUTO APP-V1-AUTO: application mobile + catalogue Telegram automatique = ACTIVÉ`
+Le service démarre avec `python shop.py` et `/health` renvoie 200.
